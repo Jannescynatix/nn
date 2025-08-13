@@ -1,11 +1,12 @@
-/* public/css/style.css (vollständig überarbeitet) */
+/* public/css/style.css (überarbeitet) */
 
 :root {
-    --bg-color: #121212;
-    --card-bg-color: #1e1e1e;
-    --text-color: #e0e0e0;
-    --link-color: #4a90e2;
-    --primary-color: #4a90e2;
+    --bg-color: #0d1117;
+    --card-bg-color: #161b22;
+    --text-color: #c9d1d9;
+    --link-color: #58a6ff;
+    --primary-color: #2188ff;
+    --border-color: #30363d;
 }
 
 body {
@@ -27,16 +28,19 @@ body {
     width: 100%;
     max-width: 400px;
     text-align: center;
+    border: 1px solid var(--border-color);
 }
 
 h1 {
-    color: var(--primary-color);
+    color: var(--link-color);
     margin-bottom: 20px;
+    font-weight: 600;
 }
 
 p {
     color: var(--text-color);
     margin-bottom: 25px;
+    font-size: 14px;
 }
 
 .auth-container form {
@@ -46,18 +50,19 @@ p {
 }
 
 .auth-container input {
-    background-color: #2a2a2a;
+    background-color: #010409;
     color: var(--text-color);
     padding: 12px;
-    border: 1px solid #444;
+    border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 16px;
-    transition: border-color 0.3s ease;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .auth-container input:focus {
     outline: none;
     border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(33, 136, 255, 0.5);
 }
 
 .auth-container button,
@@ -74,7 +79,7 @@ p {
 
 .auth-container button:hover,
 .btn:hover {
-    background-color: #3b74b6;
+    background-color: #0077e6;
     transform: translateY(-2px);
 }
 
@@ -94,15 +99,17 @@ p {
 }
 
 .auth-links .btn:hover {
-    background-color: #3b74b6;
+    background-color: #0077e6;
 }
 
 .auth-container a {
     color: var(--link-color);
     text-decoration: none;
+    transition: color 0.3s ease;
 }
 
 .auth-container a:hover {
+    color: #8bb8e4;
     text-decoration: underline;
 }
 
@@ -120,9 +127,9 @@ p {
 }
 
 .toast.success {
-    background-color: #4ae261;
+    background-color: #238636;
 }
 
 .toast.error {
-    background-color: #e24a4a;
+    background-color: #da3633;
 }

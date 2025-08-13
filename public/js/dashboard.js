@@ -1,4 +1,4 @@
-// public/js/dashboard.js (final, corrected version)
+// public/js/dashboard.js (überarbeitet)
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -8,6 +8,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     const fileIdInput = document.getElementById('file-id');
     const saveButton = document.getElementById('save-button');
     const logoutButton = document.getElementById('logout-button');
+    const fileModal = document.getElementById('file-modal');
+    const modalCloseBtn = document.querySelector('.close-btn');
+    const modalTitle = document.getElementById('modal-title');
+    const modalContent = document.getElementById('modal-content');
+    const saveLoader = document.getElementById('save-loader');
 
     // Toast-Benachrichtigung für eine schönere UX
     function showToast(message, isSuccess) {
@@ -45,6 +50,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             files.forEach(file => {
                 const fileCard = document.createElement('div');
                 fileCard.className = 'file-card';
+                fileCard.dataset.id = file._id;
+                fileCard.dataset.title = file.title;
+                fileCard.dataset.content = file.content;
                 fileCard.innerHTML = `
                     <div>
                         <h3>${file.title}</h3>
@@ -52,8 +60,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                         <small>Erstellt: ${new Date(file.createdAt).toLocaleDateString()}</small>
                     </div>
                     <div class="file-actions">
-                        <button class="edit-btn" data-id="${file._id}" data-title="${file.title}" data-content="${file.content}">Bearbeiten</button>
-                        <button class="delete-btn" data-id="${file._id}">Löschen</button>
+                        <button class="edit-btn">Bearbeiten</button>
+                        <button class="delete-btn">Löschen</button>
                     </div>
                 `;
                 fileList.appendChild(fileCard);
@@ -86,6 +94,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             message = 'Datei erfolgreich aktualisiert.';
         }
 
+        saveButton.disabled = true;
+        saveButton.innerHTML = `<span class="loader"></span> Speichern...`;
+
         try {
             res = await fetch(url, {
                 method: method,
@@ -108,13 +119,20 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         } catch (error) {
             showToast('Netzwerkfehler.', false);
+        } finally {
+            saveButton.disabled = false;
+            saveButton.innerHTML = 'Datei speichern';
         }
     });
 
-    // Event-Listener für Lösch- und Bearbeitungs-Buttons
+    // Event-Listener für Lösch-, Bearbeitungs- und Anzeigebuttons
     fileList.addEventListener('click', async (e) => {
+        const fileCard = e.target.closest('.file-card');
+        if (!fileCard) return;
+
         if (e.target.classList.contains('delete-btn')) {
-            const fileId = e.target.dataset.id;
+            e.stopPropagation();
+            const fileId = fileCard.dataset.id;
             if (confirm('Sind Sie sicher, dass Sie diese Datei löschen möchten?')) {
                 try {
                     const res = await fetch(`/api/files/${fileId}`, {
@@ -133,14 +151,31 @@ document.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         } else if (e.target.classList.contains('edit-btn')) {
-            const fileId = e.target.dataset.id;
-            const title = e.target.dataset.title;
-            const content = e.target.dataset.content;
+            e.stopPropagation();
+            const fileId = fileCard.dataset.id;
+            const title = fileCard.dataset.title;
+            const content = fileCard.dataset.content;
 
             fileForm.title.value = title;
             fileForm.content.value = content;
             fileIdInput.value = fileId;
             saveButton.textContent = 'Änderungen speichern';
+        } else {
+            // Ganze Karte anklicken zum Anzeigen des Inhalts
+            modalTitle.textContent = fileCard.dataset.title;
+            modalContent.textContent = fileCard.dataset.content;
+            fileModal.style.display = 'flex';
+        }
+    });
+
+    // Modal schließen
+    modalCloseBtn.addEventListener('click', () => {
+        fileModal.style.display = 'none';
+    });
+
+    window.addEventListener('click', (e) => {
+        if (e.target === fileModal) {
+            fileModal.style.display = 'none';
         }
     });
 
