@@ -1,41 +1,97 @@
 /* public/css/dashboard-style.css (überarbeitet) */
 
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
 :root {
     --bg-color: #0d1117;
     --card-bg-color: #161b22;
+    --sidebar-bg-color: #010409;
     --text-color: #c9d1d9;
-    --secondary-text-color: #a0a0a0;
+    --secondary-text-color: #8b949e;
     --primary-color: #2188ff;
     --danger-color: #da3633;
     --success-color: #238636;
     --border-color: #30363d;
+    --hover-bg-color: #2b3036;
 }
 
 body {
-    font-family: 'Segoe UI', Arial, sans-serif;
+    font-family: 'Roboto', sans-serif;
     background-color: var(--bg-color);
     color: var(--text-color);
     margin: 0;
     padding: 0;
+    overflow-x: hidden;
+}
+
+.dashboard-container {
     display: flex;
-    justify-content: center;
     min-height: 100vh;
 }
 
-.container {
-    background-color: var(--card-bg-color);
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
-    width: 90%;
-    max-width: 900px;
-    margin: 20px auto;
-    border: 1px solid var(--border-color);
+.sidebar {
+    width: 250px;
+    background-color: var(--sidebar-bg-color);
+    padding: 20px;
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
+    position: sticky;
+    top: 0;
+    height: 100vh;
 }
 
-header {
+.user-info {
+    text-align: center;
+    margin-bottom: 30px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 20px;
+}
+
+.user-info i {
+    font-size: 48px;
+    color: var(--secondary-text-color);
+    margin-bottom: 10px;
+}
+
+.user-info h3 {
+    margin: 0;
+    font-weight: 500;
+}
+
+.main-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.nav-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    border-radius: 6px;
+    color: var(--secondary-text-color);
+    text-decoration: none;
+    transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+.nav-item:hover, .nav-item.active {
+    background-color: var(--hover-bg-color);
+    color: var(--text-color);
+}
+
+.nav-item i {
+    margin-right: 15px;
+    width: 20px;
+    text-align: center;
+}
+
+.main-content {
+    flex-grow: 1;
+    padding: 30px;
+}
+
+.main-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -44,101 +100,57 @@ header {
     padding-bottom: 20px;
 }
 
-h1 {
-    color: var(--link-color);
+.main-header h2 {
+    font-size: 24px;
     margin: 0;
-    font-weight: 600;
 }
 
-/* Toast-Benachrichtigungen */
-.toast {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    padding: 15px 25px;
-    border-radius: 8px;
-    color: #fff;
-    font-size: 16px;
-    z-index: 1000;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+.search-container {
+    position: relative;
 }
 
-.toast.success {
-    background-color: var(--success-color);
+.search-container i {
+    position: absolute;
+    left: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--secondary-text-color);
 }
 
-.toast.error {
-    background-color: var(--danger-color);
-}
-
-@keyframes fadein {
-    from { top: 0; opacity: 0; }
-    to { top: 20px; opacity: 1; }
-}
-
-@keyframes fadeout {
-    from { opacity: 1; }
-    to { opacity: 0; }
-}
-
-/* Ladeanimation */
-.loader {
-    border: 4px solid #f3f3f3;
-    border-top: 4px solid var(--primary-color);
-    border-radius: 50%;
-    width: 20px;
-    height: 20px;
-    animation: spin 1s linear infinite;
-    margin-left: 10px;
-    display: inline-block;
-}
-
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-}
-
-/* Buttons */
-button {
-    background-color: var(--primary-color);
-    color: #fff;
-    border: none;
-    padding: 12px 20px;
+#search-input {
+    background-color: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    color: var(--text-color);
+    padding: 10px 15px 10px 40px;
     border-radius: 6px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s ease, transform 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+    width: 250px;
+    transition: border-color 0.3s ease;
 }
 
-button:hover {
-    background-color: #0077e6;
-    transform: translateY(-1px);
+#search-input:focus {
+    outline: none;
+    border-color: var(--primary-color);
 }
 
-#logout-button {
-    background-color: var(--border-color);
-    padding: 10px 15px;
+.file-list-section {
+    max-width: 900px;
+    margin: 0 auto;
 }
 
-#logout-button:hover {
-    background-color: #444;
-}
-
-/* Formular und Dateiliste */
 .file-form {
+    background-color: var(--card-bg-color);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    margin-bottom: 25px;
     display: flex;
     flex-direction: column;
     gap: 15px;
-    margin-bottom: 30px;
 }
 
 .file-form input[type="text"],
 .file-form textarea {
-    background-color: #010409;
+    background-color: var(--sidebar-bg-color);
     color: var(--text-color);
     padding: 12px;
     border: 1px solid var(--border-color);
@@ -153,7 +165,6 @@ button:hover {
 .file-form textarea:focus {
     outline: none;
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(33, 136, 255, 0.5);
 }
 
 .file-form textarea {
@@ -161,14 +172,39 @@ button:hover {
     min-height: 100px;
 }
 
-#file-list-container h2 {
-    color: var(--text-color);
-    margin-bottom: 15px;
+.form-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.form-actions button {
+    flex-grow: 1;
+    background-color: var(--primary-color);
+    color: #fff;
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+.form-actions button:hover {
+    background-color: #0077e6;
+    transform: translateY(-1px);
+}
+
+#new-file-btn {
+    background-color: var(--secondary-text-color);
+}
+
+#new-file-btn:hover {
+    background-color: #6a737d;
 }
 
 .file-card {
-    background-color: #010409;
-    padding: 15px;
+    background-color: var(--card-bg-color);
+    padding: 20px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     margin-bottom: 10px;
@@ -180,7 +216,7 @@ button:hover {
 }
 
 .file-card:hover {
-    background-color: #161b22;
+    background-color: var(--hover-bg-color);
     transform: translateY(-2px);
 }
 
@@ -222,7 +258,7 @@ button:hover {
     background-color: #b93232;
 }
 
-/* Modal für Dateivorschau */
+/* Modale Fenster */
 .modal {
     display: none;
     position: fixed;
@@ -245,8 +281,8 @@ button:hover {
     padding: 30px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
-    width: 80%;
-    max-width: 600px;
+    width: 90%;
+    max-width: 700px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
     animation: zoom-in 0.3s ease;
 }
@@ -271,13 +307,49 @@ button:hover {
 }
 
 .modal-body p {
-    white-space: pre-wrap; /* Zeilenumbrüche beibehalten */
+    white-space: pre-wrap;
     max-height: 400px;
     overflow-y: auto;
     border: 1px solid var(--border-color);
     padding: 10px;
     border-radius: 4px;
     background-color: #010409;
+}
+
+.modal-body ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.history-item {
+    background-color: #010409;
+    padding: 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.history-item p {
+    margin: 0;
+}
+
+.revert-btn {
+    background-color: #28a745;
+}
+
+.revert-btn:hover {
+    background-color: #218838;
+}
+
+.modal-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
 }
 
 .close-btn {

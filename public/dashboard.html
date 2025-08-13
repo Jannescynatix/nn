@@ -3,28 +3,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mein Dashboard</title>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="/css/dashboard-style.css">
 </head>
 <body>
-<div class="container">
-    <header>
-        <h1 id="welcome-message">Willkommen!</h1>
-        <button id="logout-button">Abmelden</button>
-    </header>
-
-    <form id="file-form" class="file-form">
-        <input type="hidden" id="file-id" name="file-id">
-        <input type="text" id="title" name="title" placeholder="Titel der Datei" required>
-        <textarea id="content" name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
-        <button type="submit" id="save-button">Datei speichern</button>
-    </form>
-
-    <div id="file-list-container">
-        <h2>Meine gespeicherten Dateien</h2>
-        <div id="file-list">
+<div class="dashboard-container">
+    <aside class="sidebar">
+        <div class="user-info">
+            <i class="fas fa-user-circle"></i>
+            <h3 id="welcome-message">Willkommen!</h3>
         </div>
-    </div>
+        <nav class="main-nav">
+            <a href="#" class="nav-item active"><i class="fas fa-folder"></i> Meine Dateien</a>
+            <a href="#" class="nav-item"><i class="fas fa-cog"></i> Einstellungen</a>
+            <a href="#" class="nav-item" id="logout-button"><i class="fas fa-sign-out-alt"></i> Abmelden</a>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="main-header">
+            <h2>Meine Dateien</h2>
+            <div class="search-container">
+                <i class="fas fa-search"></i>
+                <input type="text" id="search-input" placeholder="Nach Dateien suchen...">
+            </div>
+        </header>
+
+        <div class="content-area">
+            <section class="file-list-section">
+                <form id="file-form" class="file-form">
+                    <input type="hidden" id="file-id" name="file-id">
+                    <input type="text" id="title" name="title" placeholder="Titel der Datei" required>
+                    <textarea id="content" name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
+                    <div class="form-actions">
+                        <button type="submit" id="save-button">
+                            <span class="button-text">Datei speichern</span>
+                            <span class="loader-icon" style="display:none;"></span>
+                        </button>
+                        <button type="button" id="new-file-btn">Neue Datei</button>
+                    </div>
+                </form>
+                <div id="file-list">
+                </div>
+                <div id="no-files" style="display: none; text-align: center; color: #5a5a5a; margin-top: 20px;">
+                    Sie haben noch keine Dateien gespeichert.
+                </div>
+            </section>
+        </div>
+    </main>
 </div>
 
 <div id="file-modal" class="modal">
@@ -35,6 +62,23 @@
         </div>
         <div class="modal-body">
             <p id="modal-content"></p>
+            <div class="modal-actions">
+                <button id="edit-modal-btn" class="edit-btn">Bearbeiten</button>
+                <button id="view-history-btn" class="history-btn">Verlauf ansehen</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="history-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h2 id="history-title">Dateiverlauf</h2>
+            <span class="close-btn" id="history-close-btn">&times;</span>
+        </div>
+        <div class="modal-body">
+            <ul id="history-list">
+            </ul>
         </div>
     </div>
 </div>

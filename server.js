@@ -1,4 +1,4 @@
-// server.js
+// server.js (überarbeitet)
 
 const express = require('express');
 const http = require('http');
@@ -19,7 +19,7 @@ const File = require('./database/models/File');
 
 // Express App und Server initialisieren
 const app = express();
-app.set('trust proxy', 1); // Wichtig für Render, um die korrekte IP des Clients zu identifizieren
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 // Wichtige Konstanten
@@ -34,15 +34,14 @@ if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) console.error('FEHLER: ENCR
 
 // Passwort-Validierungsfunktion
 const validatePassword = (password) => {
-    // Mindestens 8 Zeichen, Großbuchstabe, Kleinbuchstabe, Zahl und Sonderzeichen
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
     return passwordRegex.test(password);
 };
 
 // Rate Limiting zum Schutz vor Brute-Force-Angriffen
 const loginLimiter = rateLimit({
-    windowMs: 60 * 1000, // 1 Minute
-    max: 5, // maximal 5 Versuche pro IP pro Minute
+    windowMs: 60 * 1000,
+    max: 5,
     handler: (req, res) => {
         console.warn(`Rate-Limit-Überschreitung für IP: ${req.ip}`);
         res.status(429).json({
@@ -196,7 +195,7 @@ app.post('/api/files', authMiddleware, async (req, res) => {
 });
 
 app.put('/api/files/:id', authMiddleware, async (req, res) => {
-    const { title, content } = req.body;
+    const { title, content, message } = req.body;
     console.log(`Aktualisierungsversuch für Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
     try {
         const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
@@ -204,16 +203,71 @@ app.put('/api/files/:id', authMiddleware, async (req, res) => {
             console.warn(`Aktualisierung fehlgeschlagen: Datei nicht gefunden. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
             return res.status(404).json({ message: 'Datei nicht gefunden.' });
         }
+
+        // Speichere die aktuelle Version im Verlauf
+        file.history.push({
+            content: file.content,
+            iv: file.iv,
+            message: message || 'Änderung ohne Nachricht'
+        });
+
         const encryptedData = encrypt(content);
         file.title = title;
         file.content = encryptedData.encryptedData;
         file.iv = encryptedData.iv;
         await file.save();
+
         console.log(`Datei erfolgreich aktualisiert. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(200).json({ message: 'Datei erfolgreich aktualisiert.' });
     } catch (err) {
         console.error(`Aktualisierung fehlgeschlagen. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Aktualisierung fehlgeschlagen', error: err.message });
+    }
+});
+
+// NEUE ROUTE: Dateiverlauf abrufen
+app.get('/api/files/:id/history', authMiddleware, async (req, res) => {
+    try {
+        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!file) {
+            return res.status(404).json({ message: 'Datei nicht gefunden.' });
+        }
+        const decryptedHistory = file.history.map(item => ({
+            timestamp: item.timestamp,
+            message: item.message,
+            content: decrypt(item.content, item.iv)
+        }));
+        res.status(200).json(decryptedHistory);
+    } catch (err) {
+        res.status(500).json({ message: 'Verlauf abrufen fehlgeschlagen', error: err.message });
+    }
+});
+
+// NEUE ROUTE: Datei auf eine alte Version zurücksetzen
+app.put('/api/files/:id/revert', authMiddleware, async (req, res) => {
+    const { historyIndex } = req.body;
+    try {
+        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!file || !file.history[historyIndex]) {
+            return res.status(404).json({ message: 'Datei oder Version nicht gefunden.' });
+        }
+
+        const oldVersion = file.history[historyIndex];
+
+        // Speichere die aktuelle Version im Verlauf, bevor du zurücksetzt
+        file.history.push({
+            content: file.content,
+            iv: file.iv,
+            message: `Wiederherstellung von Version vom ${oldVersion.timestamp.toLocaleString()}`
+        });
+
+        file.content = oldVersion.content;
+        file.iv = oldVersion.iv;
+        await file.save();
+
+        res.status(200).json({ message: 'Datei erfolgreich wiederhergestellt.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Wiederherstellung fehlgeschlagen', error: err.message });
     }
 });
 
