@@ -38,12 +38,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const data = await res.json();
+            alert(data.message);
             if (res.status === 200) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
                 window.location.href = '/dashboard';
-            } else {
-                alert(data.message);
             }
         });
     }

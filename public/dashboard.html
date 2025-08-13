@@ -8,12 +8,16 @@
 </head>
 <body>
 <div class="container">
-    <h1 id="welcome-message">Willkommen!</h1>
+    <header>
+        <h1 id="welcome-message">Willkommen!</h1>
+        <button id="logout-button">Abmelden</button>
+    </header>
 
     <form id="file-form" class="file-form">
-        <input type="text" name="title" placeholder="Titel der Datei" required>
-        <textarea name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
-        <button type="submit">Datei speichern</button>
+        <input type="hidden" id="file-id" name="file-id">
+        <input type="text" id="title" name="title" placeholder="Titel der Datei" required>
+        <textarea id="content" name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
+        <button type="submit" id="save-button">Datei speichern</button>
     </form>
 
     <div id="file-list-container">

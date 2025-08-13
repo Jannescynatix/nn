@@ -21,10 +21,31 @@ body {
     margin: 20px;
 }
 
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
 h1 {
     color: #333;
-    text-align: center;
-    margin-bottom: 20px;
+    margin: 0;
+}
+
+#logout-button {
+    background-color: #dc3545;
+    color: #fff;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+#logout-button:hover {
+    background-color: #c82333;
 }
 
 .file-form {
@@ -92,8 +113,12 @@ h1 {
     font-size: 14px;
 }
 
-.file-card button {
-    background-color: #dc3545;
+.file-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.file-actions button {
     color: #fff;
     border: none;
     padding: 8px 12px;
@@ -102,6 +127,18 @@ h1 {
     transition: background-color 0.3s ease;
 }
 
-.file-card button:hover {
+.edit-btn {
+    background-color: #ffc107;
+}
+
+.edit-btn:hover {
+    background-color: #e0a800;
+}
+
+.delete-btn {
+    background-color: #dc3545;
+}
+
+.delete-btn:hover {
     background-color: #c82333;
 }

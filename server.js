@@ -17,19 +17,29 @@ const File = require('./database/models/File');
 
 // Express App und Server initialisieren
 const app = express();
+app.set('trust proxy', 1); // Wichtig für Render, um die korrekte IP des Clients zu identifizieren
 const server = http.createServer(app);
 
 // Wichtige Konstanten
-const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
 const JWT_SECRET = process.env.JWT_SECRET;
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
-const iv = crypto.randomBytes(16); // Initialisierungsvektor für die Verschlüsselung
+
+// Passwort-Validierungsfunktion
+const validatePassword = (password) => {
+    // Mindestens 8 Zeichen, Großbuchstabe, Kleinbuchstabe, Zahl und Sonderzeichen
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+    return passwordRegex.test(password);
+};
 
 // Rate Limiting zum Schutz vor Brute-Force-Angriffen
 const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 Minuten
-    max: 10, // maximal 10 Versuche pro IP pro 15 Minuten
-    message: 'Zu viele Login-Versuche von dieser IP, bitte versuchen Sie es in 15 Minuten erneut.'
+    windowMs: 60 * 1000, // 1 Minute
+    max: 5, // maximal 5 Versuche pro IP pro Minute
+    handler: (req, res) => {
+        res.status(429).json({
+            message: 'Zu viele Login-Versuche von dieser IP, bitte versuchen Sie es in einer Minute erneut.'
+        });
+    }
 });
 
 // Middleware
@@ -59,6 +69,7 @@ connectDB();
 
 // Datenverschlüsselungsfunktionen
 function encrypt(text) {
+    const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
     let encrypted = cipher.update(text);
     encrypted = Buffer.concat([encrypted, cipher.final()]);
@@ -66,10 +77,15 @@ function encrypt(text) {
 }
 
 function decrypt(encryptedData, iv) {
-    const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), Buffer.from(iv, 'hex'));
-    let decrypted = decipher.update(Buffer.from(encryptedData, 'hex'));
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
+    try {
+        const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), Buffer.from(iv, 'hex'));
+        let decrypted = decipher.update(Buffer.from(encryptedData, 'hex'));
+        decrypted = Buffer.concat([decrypted, decipher.final()]);
+        return decrypted.toString();
+    } catch (error) {
+        console.error('Entschlüsselungsfehler:', error);
+        return 'Fehler beim Entschlüsseln der Daten.';
+    }
 }
 
 // Authentifizierungs-Middleware
@@ -95,9 +111,20 @@ app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'log
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
 
+// Logout-Route
+app.get('/api/logout', (req, res) => {
+    // Client-seitig löschen
+    res.status(200).json({ message: 'Erfolgreich abgemeldet.' });
+});
+
 // Registrierung
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
+    if (!validatePassword(password)) {
+        return res.status(400).json({
+            message: 'Das Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen enthalten.'
+        });
+    }
     try {
         const user = new User({ username, email, password });
         await user.save();
@@ -137,6 +164,24 @@ app.post('/api/files', authMiddleware, async (req, res) => {
         res.status(201).json({ message: 'Datei erfolgreich gespeichert.' });
     } catch (err) {
         res.status(500).json({ message: 'Speichern fehlgeschlagen', error: err.message });
+    }
+});
+
+app.put('/api/files/:id', authMiddleware, async (req, res) => {
+    const { title, content } = req.body;
+    try {
+        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!file) {
+            return res.status(404).json({ message: 'Datei nicht gefunden.' });
+        }
+        const encryptedData = encrypt(content);
+        file.title = title;
+        file.content = encryptedData.encryptedData;
+        file.iv = encryptedData.iv;
+        await file.save();
+        res.status(200).json({ message: 'Datei erfolgreich aktualisiert.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Aktualisierung fehlgeschlagen', error: err.message });
     }
 });
 
