@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sicherer Chat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="auth-container">
+    <div id="login-form" class="auth-form">
+        <h2>Login</h2>
+        <input type="text" id="login-username" placeholder="Benutzername">
+        <input type="password" id="login-password" placeholder="Passwort">
+        <button id="login-btn">Anmelden</button>
+        <p id="auth-error" class="error-message"></p>
+        <p>Noch keinen Account? <a href="#" id="show-register">Registrieren</a></p>
+    </div>
+
+    <div id="register-form" class="auth-form" style="display:none;">
+        <h2>Registrieren</h2>
+        <input type="email" id="register-email" placeholder="E-Mail">
+        <input type="text" id="register-username" placeholder="Benutzername">
+        <input type="password" id="register-password" placeholder="Passwort">
+        <button id="register-btn">Registrieren</button>
+        <p id="register-message" class="success-message"></p>
+        <p>Bereits einen Account? <a href="#" id="show-login">Anmelden</a></p>
+    </div>
+</div>
+
+<div id="chat-app" style="display:none;">
+    <div class="sidebar">
+        <div class="user-info">
+            <span id="current-username"></span>
+            <button id="logout-btn">Abmelden</button>
+        </div>
+        <div class="search-container">
+            <input type="text" id="user-search" placeholder="Benutzer suchen">
+            <ul id="user-search-results"></ul>
+            <button id="create-group-btn">Gruppe erstellen</button>
+        </div>
+        <div class="chat-list-container">
+            <h3>Chats</h3>
+            <ul id="chat-list"></ul>
+        </div>
+        <div class="group-list-container">
+            <h3>Gruppen</h3>
+            <ul id="group-list"></ul>
+        </div>
+    </div>
+    <div class="main-chat">
+        <div id="chat-header">
+            <h3 id="chat-title">Wähle einen Chat aus...</h3>
+            <button id="report-chat-btn" style="display:none;">⚠️ Melden</button>
+        </div>
+        <div id="messages-container"></div>
+        <div class="message-input-container">
+            <input type="text" id="message-input" placeholder="Nachricht senden...">
+            <button id="send-message-btn">Senden</button>
+        </div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
