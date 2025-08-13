@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mein Dashboard</title>
+    <link rel="stylesheet" href="/css/dashboard-style.css">
+</head>
+<body>
+<div class="container">
+    <h1 id="welcome-message">Willkommen!</h1>
+
+    <form id="file-form" class="file-form">
+        <input type="text" name="title" placeholder="Titel der Datei" required>
+        <textarea name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
+        <button type="submit">Datei speichern</button>
+    </form>
+
+    <div id="file-list-container">
+        <h2>Meine gespeicherten Dateien</h2>
+        <div id="file-list">
+        </div>
+    </div>
+</div>
+<script src="/js/dashboard.js"></script>
+</body>
+</html>

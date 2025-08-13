@@ -3,36 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Anmeldung & Registrierung</title>
+    <title>Sichere Dateiverwaltung</title>
     <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<div class="container">
-    <div id="auth-forms">
-        <div id="login-form" class="auth-form active">
-            <h2>Anmelden</h2>
-            <form>
-                <input type="email" id="login-email" placeholder="E-Mail" required>
-                <input type="password" id="login-password" placeholder="Passwort" required>
-                <button type="submit">Anmelden</button>
-                <p class="error-message"></p>
-            </form>
-            <a href="#" id="show-register">Noch kein Konto? Registrieren</a>
-        </div>
-
-        <div id="register-form" class="auth-form">
-            <h2>Registrieren</h2>
-            <form>
-                <input type="text" id="register-username" placeholder="Benutzername" required>
-                <input type="email" id="register-email" placeholder="E-Mail" required>
-                <input type="password" id="register-password" placeholder="Passwort" required>
-                <button type="submit">Registrieren</button>
-                <p class="error-message"></p>
-            </form>
-            <a href="#" id="show-login">Bereits registriert? Anmelden</a>
-        </div>
+<div class="auth-container">
+    <h1>Willkommen</h1>
+    <p>Eine sichere Plattform, um Ihre wichtigen Dateien und Texte zu speichern.</p>
+    <div class="auth-links">
+        <a href="/login" class="btn">Anmelden</a>
+        <a href="/register" class="btn">Registrieren</a>
     </div>
 </div>
-<script src="/js/script.js"></script>
 </body>
 </html>
