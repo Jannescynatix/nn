@@ -1,4 +1,4 @@
-// public/js/dashboard.js (vollständig überarbeitet)
+// public/js/dashboard.js (final, corrected version)
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
