@@ -13,61 +13,111 @@
         <div class="user-info">
             <i class="fas fa-user-circle"></i>
             <h3 id="welcome-message">Willkommen!</h3>
+            <small id="user-email"></small>
         </div>
         <nav class="main-nav">
-            <a href="#" class="nav-item active"><i class="fas fa-folder"></i> Meine Dateien</a>
-            <a href="#" class="nav-item"><i class="fas fa-cog"></i> Einstellungen</a>
-            <a href="#" class="nav-item" id="logout-button"><i class="fas fa-sign-out-alt"></i> Abmelden</a>
+            <a href="#files" class="nav-item active" data-view="files"><i class="fas fa-folder"></i> Meine Dateien</a>
+            <a href="#settings" class="nav-item" data-view="settings"><i class="fas fa-cog"></i> Einstellungen</a>
+            <a href="#admin" class="nav-item admin-link" data-view="admin" style="display: none;"><i class="fas fa-shield-alt"></i> Admin-Bereich</a>
         </nav>
+        <div class="logout-container">
+            <button id="logout-button"><i class="fas fa-sign-out-alt"></i> Abmelden</button>
+        </div>
     </aside>
 
     <main class="main-content">
-        <header class="main-header">
-            <h2>Meine Dateien</h2>
-            <div class="search-container">
-                <i class="fas fa-search"></i>
-                <input type="text" id="search-input" placeholder="Nach Dateien suchen...">
-            </div>
-        </header>
-
-        <div class="content-area">
-            <section class="file-list-section">
-                <form id="file-form" class="file-form">
-                    <input type="hidden" id="file-id" name="file-id">
-                    <input type="text" id="title" name="title" placeholder="Titel der Datei" required>
-                    <textarea id="content" name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
-                    <div class="form-actions">
-                        <button type="submit" id="save-button">
-                            <span class="button-text">Datei speichern</span>
-                            <span class="loader-icon" style="display:none;"></span>
-                        </button>
-                        <button type="button" id="new-file-btn">Neue Datei</button>
+        <section id="files-view" class="view active">
+            <header class="main-header">
+                <h2>Meine Dateien</h2>
+                <div class="search-container">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-input" placeholder="Nach Dateien suchen...">
+                </div>
+            </header>
+            <div class="content-wrapper">
+                <div class="file-creation-area">
+                    <h3>Datei erstellen/bearbeiten</h3>
+                    <form id="file-form" class="file-form">
+                        <input type="hidden" id="file-id" name="file-id">
+                        <input type="text" id="title" name="title" placeholder="Titel der Datei" required>
+                        <textarea id="content" name="content" placeholder="Geben Sie hier Ihren geheimen Text ein..." required></textarea>
+                        <div class="form-actions">
+                            <button type="submit" id="save-button">
+                                <span class="button-text">Datei speichern</span>
+                            </button>
+                            <button type="button" id="new-file-btn">Neue Datei</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="file-list-area">
+                    <h3>Gespeicherte Dateien</h3>
+                    <div id="file-list">
                     </div>
-                </form>
-                <div id="file-list">
+                    <div id="no-files" style="display: none; text-align: center; color: #5a5a5a; margin-top: 20px;">
+                        Sie haben noch keine Dateien gespeichert.
+                    </div>
                 </div>
-                <div id="no-files" style="display: none; text-align: center; color: #5a5a5a; margin-top: 20px;">
-                    Sie haben noch keine Dateien gespeichert.
-                </div>
-            </section>
-        </div>
-    </main>
-</div>
-
-<div id="file-modal" class="modal">
-    <div class="modal-content">
-        <div class="modal-header">
-            <h2 id="modal-title"></h2>
-            <span class="close-btn">&times;</span>
-        </div>
-        <div class="modal-body">
-            <p id="modal-content"></p>
-            <div class="modal-actions">
-                <button id="edit-modal-btn" class="edit-btn">Bearbeiten</button>
-                <button id="view-history-btn" class="history-btn">Verlauf ansehen</button>
             </div>
-        </div>
-    </div>
+        </section>
+
+        <section id="settings-view" class="view" style="display: none;">
+            <header class="main-header">
+                <h2>Einstellungen</h2>
+            </header>
+            <div class="settings-content">
+                <div class="setting-card">
+                    <h3>Account-Daten</h3>
+                    <p><strong>Benutzername:</strong> <span id="settings-username"></span></p>
+                    <p><strong>E-Mail:</strong> <span id="settings-email"></span></p>
+                </div>
+                <div class="setting-card">
+                    <h3>Passwort ändern</h3>
+                    <form id="change-password-form" class="form-horizontal">
+                        <div class="form-group">
+                            <label for="old-password">Altes Passwort</label>
+                            <input type="password" id="old-password" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="new-password">Neues Passwort</label>
+                            <input type="password" id="new-password" required>
+                        </div>
+                        <button type="submit" class="btn">Passwort ändern</button>
+                    </form>
+                </div>
+                <div class="setting-card">
+                    <h3>Account löschen</h3>
+                    <p>Wenn Sie Ihren Account löschen, werden alle Ihre Dateien dauerhaft gelöscht.</p>
+                    <button id="delete-account-btn" class="btn danger-btn">Account löschen</button>
+                </div>
+            </div>
+        </section>
+
+        <section id="admin-view" class="view" style="display: none;">
+            <header class="main-header">
+                <h2>Admin-Dashboard</h2>
+            </header>
+            <div class="admin-content">
+                <div class="stats-cards">
+                    <div class="stat-card">
+                        <h3>Gesamtnutzer</h3>
+                        <p id="stat-users"></p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Gesamtdateien</h3>
+                        <p id="stat-files"></p>
+                    </div>
+                </div>
+                <div class="admin-card">
+                    <h3>Benutzerverwaltung</h3>
+                    <div id="user-list"></div>
+                </div>
+                <div class="admin-card">
+                    <h3>Dateiverwaltung</h3>
+                    <div id="admin-file-list"></div>
+                </div>
+            </div>
+        </section>
+    </main>
 </div>
 
 <div id="history-modal" class="modal">

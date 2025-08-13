@@ -1,59 +1,125 @@
-// public/js/dashboard.js (überarbeitet)
+// public/js/dashboard.js (überarbeitet und final)
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
     const username = localStorage.getItem('username');
+    const isAdmin = localStorage.getItem('isAdmin') === 'true';
+
+    // UI-Elemente
+    const welcomeMessage = document.getElementById('welcome-message');
+    const userEmail = document.getElementById('user-email');
+    const navItems = document.querySelectorAll('.nav-item');
+    const views = document.querySelectorAll('.view');
+    const adminLink = document.querySelector('.admin-link');
     const fileForm = document.getElementById('file-form');
     const fileList = document.getElementById('file-list');
     const fileIdInput = document.getElementById('file-id');
+    const titleInput = document.getElementById('title');
+    const contentInput = document.getElementById('content');
     const saveButton = document.getElementById('save-button');
-    const logoutButton = document.getElementById('logout-button');
-    const fileModal = document.getElementById('file-modal');
-    const historyModal = document.getElementById('history-modal');
-    const modalCloseBtn = fileModal.querySelector('.close-btn');
-    const historyCloseBtn = historyModal.querySelector('.close-btn');
-    const modalTitle = document.getElementById('modal-title');
-    const modalContent = document.getElementById('modal-content');
-    const editModalBtn = document.getElementById('edit-modal-btn');
-    const viewHistoryBtn = document.getElementById('view-history-btn');
-    const historyList = document.getElementById('history-list');
     const newFileBtn = document.getElementById('new-file-btn');
     const searchInput = document.getElementById('search-input');
     const noFilesMessage = document.getElementById('no-files');
+    const logoutButton = document.getElementById('logout-button');
+    const historyModal = document.getElementById('history-modal');
+    const historyCloseBtn = document.getElementById('history-close-btn');
+    const historyList = document.getElementById('history-list');
 
-    let allFiles = []; // Speichert alle Dateien für die Suche
+    // Einstellungs-Ansicht
+    const settingsUsername = document.getElementById('settings-username');
+    const settingsEmail = document.getElementById('settings-email');
+    const changePasswordForm = document.getElementById('change-password-form');
+    const oldPasswordInput = document.getElementById('old-password');
+    const newPasswordInput = document.getElementById('new-password');
+    const deleteAccountBtn = document.getElementById('delete-account-btn');
 
-    // Toast-Benachrichtigung für eine schönere UX
+    // Admin-Ansicht
+    const adminStatsUsers = document.getElementById('stat-users');
+    const adminStatsFiles = document.getElementById('stat-files');
+    const adminUserList = document.getElementById('user-list');
+    const adminFileList = document.getElementById('admin-file-list');
+
+    let allFiles = [];
+
+    // --- Hilfsfunktionen ---
     function showToast(message, isSuccess) {
         const toast = document.createElement('div');
         toast.className = `toast ${isSuccess ? 'success' : 'error'}`;
         toast.textContent = message;
         document.body.appendChild(toast);
-        setTimeout(() => {
-            toast.remove();
-        }, 3000);
+        setTimeout(() => toast.remove(), 3000);
     }
 
+    // --- Routing & Navigation ---
+    const showView = (viewId) => {
+        views.forEach(view => {
+            view.classList.remove('active');
+            view.style.display = 'none';
+        });
+        const activeView = document.getElementById(viewId);
+        if (activeView) {
+            activeView.classList.add('active');
+            activeView.style.display = 'block';
+        }
+        navItems.forEach(item => {
+            if (item.dataset.view === viewId.replace('-view', '')) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    };
+
+    const handleNavigation = (view) => {
+        showView(`${view}-view`);
+        if (view === 'files') loadFiles();
+        if (view === 'settings') loadUserSettings();
+        if (view === 'admin') loadAdminData();
+    };
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleNavigation(e.currentTarget.dataset.view);
+        });
+    });
+
+    if (window.location.hash) {
+        const view = window.location.hash.substring(1);
+        handleNavigation(view);
+    } else {
+        handleNavigation('files');
+    }
+
+    // --- Allgemeine Logik ---
     if (!token || !username) {
         window.location.href = '/login';
         return;
     }
 
-    document.getElementById('welcome-message').textContent = username;
+    if (isAdmin) {
+        adminLink.style.display = 'flex';
+    }
 
-    // Funktion zum Laden der Dateien
+    welcomeMessage.textContent = username;
+
+    logoutButton.addEventListener('click', () => {
+        localStorage.clear();
+        showToast('Erfolgreich abgemeldet.', true);
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 1000);
+    });
+
+    // --- Dateien-Logik ---
     const loadFiles = async () => {
         try {
-            const res = await fetch('/api/files', {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-
+            const res = await fetch('/api/files', { headers: { 'Authorization': `Bearer ${token}` } });
             if (res.status === 401) {
                 localStorage.clear();
                 window.location.href = '/login';
                 return;
             }
-
             const files = await res.json();
             allFiles = files;
             renderFileList(allFiles);
@@ -69,7 +135,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             noFilesMessage.style.display = 'none';
         }
-
         files.forEach(file => {
             const fileCard = document.createElement('div');
             fileCard.className = 'file-card';
@@ -85,111 +150,71 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <div class="file-actions">
                     <button class="edit-btn">Bearbeiten</button>
                     <button class="delete-btn">Löschen</button>
+                    <button class="history-btn">Verlauf</button>
                 </div>
             `;
             fileList.appendChild(fileCard);
         });
     };
 
-    // Formular zum Speichern/Bearbeiten einer Datei
     fileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const title = fileForm.title.value;
-        const content = fileForm.content.value;
+        const title = titleInput.value;
+        const content = contentInput.value;
         const fileId = fileIdInput.value;
+        if (!title || !content) return showToast('Titel und Inhalt dürfen nicht leer sein.', false);
 
-        if (!title || !content) {
-            showToast('Titel und Inhalt dürfen nicht leer sein.', false);
-            return;
-        }
-
-        let res;
-        let method = 'POST';
-        let url = '/api/files';
-        let message = 'Datei erfolgreich gespeichert.';
-
-        if (fileId) {
-            method = 'PUT';
-            url = `/api/files/${fileId}`;
-            message = 'Datei erfolgreich aktualisiert.';
-        }
-
-        saveButton.disabled = true;
-        saveButton.innerHTML = `<span class="loader-icon"></span> Speichern...`;
+        const url = fileId ? `/api/files/${fileId}` : '/api/files';
+        const method = fileId ? 'PUT' : 'POST';
 
         try {
-            res = await fetch(url, {
-                method: method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                 body: JSON.stringify({ title, content })
             });
-
             if (res.ok) {
-                showToast(message, true);
-                fileForm.reset();
-                fileIdInput.value = '';
-                saveButton.innerHTML = `<span class="button-text">Datei speichern</span>`;
+                showToast(fileId ? 'Datei aktualisiert.' : 'Datei gespeichert.', true);
+                newFileBtn.click();
                 await loadFiles();
             } else {
                 const errorData = await res.json();
-                showToast(errorData.message || 'Ein Fehler ist aufgetreten.', false);
+                showToast(errorData.message || 'Fehler.', false);
             }
         } catch (error) {
             showToast('Netzwerkfehler.', false);
-        } finally {
-            saveButton.disabled = false;
-            saveButton.innerHTML = `<span class="button-text">Datei speichern</span>`;
         }
     });
 
-    // Event-Listener für Lösch-, Bearbeitungs- und Anzeigebuttons
     fileList.addEventListener('click', async (e) => {
         const fileCard = e.target.closest('.file-card');
         if (!fileCard) return;
-
         const fileId = fileCard.dataset.id;
-        const fileTitle = fileCard.dataset.title;
-        const fileContent = fileCard.dataset.content;
-
         if (e.target.classList.contains('delete-btn')) {
-            e.stopPropagation();
-            if (confirm('Sind Sie sicher, dass Sie diese Datei löschen möchten?')) {
+            if (confirm('Sicher löschen?')) {
                 try {
-                    const res = await fetch(`/api/files/${fileId}`, {
-                        method: 'DELETE',
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                    if (res.ok) {
-                        showToast('Datei erfolgreich gelöscht.', true);
-                        await loadFiles();
-                    } else {
-                        const errorData = await res.json();
-                        showToast(errorData.message || 'Löschen fehlgeschlagen.', false);
-                    }
-                } catch (error) {
-                    showToast('Netzwerkfehler.', false);
-                }
+                    const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) { showToast('Datei gelöscht.', true); await loadFiles(); }
+                    else { const errorData = await res.json(); showToast(errorData.message || 'Löschen fehlgeschlagen.', false); }
+                } catch (error) { showToast('Netzwerkfehler.', false); }
             }
         } else if (e.target.classList.contains('edit-btn')) {
-            e.stopPropagation();
-            fileForm.title.value = fileTitle;
-            fileForm.content.value = fileContent;
-            fileIdInput.value = fileId;
-            saveButton.innerHTML = `<span class="button-text">Änderungen speichern</span>`;
-        } else {
-            // Ganze Karte anklicken zum Anzeigen des Inhalts
-            modalTitle.textContent = fileTitle;
-            modalContent.textContent = fileContent;
-            fileModal.style.display = 'flex';
-            editModalBtn.dataset.id = fileId;
-            viewHistoryBtn.dataset.id = fileId;
+            const file = allFiles.find(f => f._id === fileId);
+            if (file) {
+                titleInput.value = file.title;
+                contentInput.value = file.content;
+                fileIdInput.value = file._id;
+                saveButton.textContent = 'Änderungen speichern';
+                document.documentElement.scrollTop = 0; // Nach oben scrollen
+            }
+        } else if (e.target.classList.contains('history-btn')) {
+            const file = allFiles.find(f => f._id === fileId);
+            if (file) {
+                await loadHistory(file._id);
+            }
         }
     });
 
-    // Suchfunktion
     searchInput.addEventListener('input', () => {
         const searchTerm = searchInput.value.toLowerCase();
         const filteredFiles = allFiles.filter(file =>
@@ -199,40 +224,16 @@ document.addEventListener('DOMContentLoaded', async () => {
         renderFileList(filteredFiles);
     });
 
-    // Modal-Logik
-    const closeModal = () => {
-        fileModal.style.display = 'none';
-        historyModal.style.display = 'none';
-    };
-
-    modalCloseBtn.addEventListener('click', closeModal);
-    historyCloseBtn.addEventListener('click', closeModal);
-    window.addEventListener('click', (e) => {
-        if (e.target === fileModal || e.target === historyModal) {
-            closeModal();
-        }
+    newFileBtn.addEventListener('click', () => {
+        fileForm.reset();
+        fileIdInput.value = '';
+        saveButton.textContent = 'Datei speichern';
     });
 
-    // Datei aus Modal bearbeiten
-    editModalBtn.addEventListener('click', () => {
-        const fileId = editModalBtn.dataset.id;
-        const file = allFiles.find(f => f._id === fileId);
-        if (file) {
-            fileForm.title.value = file.title;
-            fileForm.content.value = file.content;
-            fileIdInput.value = file._id;
-            saveButton.innerHTML = `<span class="button-text">Änderungen speichern</span>`;
-        }
-        closeModal();
-    });
-
-    // Dateiverlauf anzeigen
-    viewHistoryBtn.addEventListener('click', async () => {
-        const fileId = viewHistoryBtn.dataset.id;
+    // --- Dateiverlauf-Logik ---
+    const loadHistory = async (fileId) => {
         try {
-            const res = await fetch(`/api/files/${fileId}/history`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
+            const res = await fetch(`/api/files/${fileId}/history`, { headers: { 'Authorization': `Bearer ${token}` } });
             if (res.ok) {
                 const history = await res.json();
                 historyList.innerHTML = '';
@@ -241,7 +242,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                     historyItem.className = 'history-item';
                     historyItem.innerHTML = `
                         <p>${new Date(item.timestamp).toLocaleString()}: ${item.message}</p>
-                        <button class="revert-btn" data-index="${index}">Wiederherstellen</button>
+                        <button class="revert-btn" data-index="${index}" data-file-id="${fileId}">Wiederherstellen</button>
                     `;
                     historyList.appendChild(historyItem);
                 });
@@ -252,26 +253,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         } catch (error) {
             showToast('Netzwerkfehler.', false);
         }
-    });
+    };
 
-    // Version wiederherstellen
     historyList.addEventListener('click', async (e) => {
         if (e.target.classList.contains('revert-btn')) {
-            const fileId = viewHistoryBtn.dataset.id;
+            const fileId = e.target.dataset.fileId;
             const historyIndex = e.target.dataset.index;
-            if (confirm('Sind Sie sicher, dass Sie diese Version wiederherstellen möchten?')) {
+            if (confirm('Sicher wiederherstellen?')) {
                 try {
                     const res = await fetch(`/api/files/${fileId}/revert`, {
                         method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                         body: JSON.stringify({ historyIndex })
                     });
                     if (res.ok) {
-                        showToast('Datei erfolgreich wiederhergestellt.', true);
-                        closeModal();
+                        showToast('Datei wiederhergestellt.', true);
+                        historyModal.style.display = 'none';
                         await loadFiles();
                     } else {
                         const errorData = await res.json();
@@ -284,21 +281,193 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // "Neue Datei" Button
-    newFileBtn.addEventListener('click', () => {
-        fileForm.reset();
-        fileIdInput.value = '';
-        saveButton.innerHTML = `<span class="button-text">Datei speichern</span>`;
+    historyCloseBtn.addEventListener('click', () => historyModal.style.display = 'none');
+    window.addEventListener('click', (e) => {
+        if (e.target === historyModal) {
+            historyModal.style.display = 'none';
+        }
     });
 
-    // Logout-Funktion
-    logoutButton.addEventListener('click', () => {
-        localStorage.clear();
-        showToast('Erfolgreich abgemeldet.', true);
-        setTimeout(() => {
-            window.location.href = '/login';
-        }, 1000);
+    // --- Einstellungen-Logik ---
+    const loadUserSettings = async () => {
+        try {
+            const res = await fetch('/api/account', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const user = await res.json();
+                settingsUsername.textContent = user.username;
+                settingsEmail.textContent = user.email;
+                userEmail.textContent = user.email;
+            }
+        } catch (error) {
+            showToast('Fehler beim Laden der Account-Daten.', false);
+        }
+    };
+
+    changePasswordForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const oldPassword = oldPasswordInput.value;
+        const newPassword = newPasswordInput.value;
+        try {
+            const res = await fetch('/api/account/password', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ oldPassword, newPassword })
+            });
+            if (res.ok) {
+                showToast('Passwort geändert.', true);
+                changePasswordForm.reset();
+            } else {
+                const errorData = await res.json();
+                showToast(errorData.message || 'Fehler beim Ändern des Passworts.', false);
+            }
+        } catch (error) {
+            showToast('Netzwerkfehler.', false);
+        }
     });
 
+    deleteAccountBtn.addEventListener('click', async () => {
+        if (confirm('Sicher? Alle Ihre Daten werden gelöscht!')) {
+            try {
+                const res = await fetch('/api/account', { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                if (res.ok) {
+                    showToast('Account gelöscht.', true);
+                    localStorage.clear();
+                    setTimeout(() => window.location.href = '/', 2000);
+                } else {
+                    const errorData = await res.json();
+                    showToast(errorData.message || 'Fehler beim Löschen des Accounts.', false);
+                }
+            } catch (error) {
+                showToast('Netzwerkfehler.', false);
+            }
+        }
+    });
+
+    // --- Admin-Logik ---
+    const loadAdminData = async () => {
+        if (!isAdmin) return;
+        try {
+            const statsRes = await fetch('/api/admin/stats', { headers: { 'Authorization': `Bearer ${token}` } });
+            const stats = await statsRes.json();
+            adminStatsUsers.textContent = stats.userCount;
+            adminStatsFiles.textContent = stats.fileCount;
+
+            const usersRes = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
+            const users = await usersRes.json();
+            renderAdminUsers(users);
+
+            const filesRes = await fetch('/api/admin/files', { headers: { 'Authorization': `Bearer ${token}` } });
+            const files = await filesRes.json();
+            renderAdminFiles(files);
+        } catch (error) {
+            showToast('Fehler beim Laden der Admin-Daten.', false);
+        }
+    };
+
+    const renderAdminUsers = (users) => {
+        let html = `
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>E-Mail</th>
+                        <th>Admin</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        users.forEach(user => {
+            html += `
+                <tr>
+                    <td>${user.username}</td>
+                    <td>${user.email}</td>
+                    <td>${user.isAdmin ? 'Ja' : 'Nein'}</td>
+                    <td class="table-actions">
+                        <button class="btn reset-password-btn" data-id="${user._id}">Passwort</button>
+                        <button class="btn danger-btn delete-user-btn" data-id="${user._id}">Löschen</button>
+                    </td>
+                </tr>
+            `;
+        });
+        html += `
+                </tbody>
+            </table>
+        `;
+        adminUserList.innerHTML = html;
+    };
+
+    const renderAdminFiles = (files) => {
+        let html = `
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Titel</th>
+                        <th>Besitzer</th>
+                        <th>Erstellt</th>
+                        <th>Aktionen</th>
+                    </tr>
+                </thead>
+                <tbody>
+        `;
+        files.forEach(file => {
+            html += `
+                <tr>
+                    <td>${file.title}</td>
+                    <td>${file.username} (${file.email})</td>
+                    <td>${new Date(file.createdAt).toLocaleDateString()}</td>
+                    <td class="table-actions">
+                        <button class="btn danger-btn delete-admin-file-btn" data-id="${file._id}">Löschen</button>
+                    </td>
+                </tr>
+            `;
+        });
+        html += `
+                </tbody>
+            </table>
+        `;
+        adminFileList.innerHTML = html;
+    };
+
+    adminUserList.addEventListener('click', async (e) => {
+        const userId = e.target.dataset.id;
+        if (e.target.classList.contains('reset-password-btn')) {
+            const newPass = prompt('Neues Passwort eingeben:');
+            if (newPass) {
+                try {
+                    const res = await fetch(`/api/admin/users/${userId}/password`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                        body: JSON.stringify({ newPassword: newPass })
+                    });
+                    if (res.ok) showToast('Passwort geändert.', true);
+                    else { const err = await res.json(); showToast(err.message || 'Fehler.', false); }
+                } catch (error) { showToast('Netzwerkfehler.', false); }
+            }
+        } else if (e.target.classList.contains('delete-user-btn')) {
+            if (confirm('Sicher? Alle Dateien werden auch gelöscht!')) {
+                try {
+                    const res = await fetch(`/api/admin/users/${userId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) { showToast('Benutzer gelöscht.', true); await loadAdminData(); }
+                    else { const err = await res.json(); showToast(err.message || 'Fehler.', false); }
+                } catch (error) { showToast('Netzwerkfehler.', false); }
+            }
+        }
+    });
+
+    adminFileList.addEventListener('click', async (e) => {
+        if (e.target.classList.contains('delete-admin-file-btn')) {
+            const fileId = e.target.dataset.id;
+            if (confirm('Sicher?')) {
+                try {
+                    const res = await fetch(`/api/admin/files/${fileId}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                    if (res.ok) { showToast('Datei gelöscht.', true); await loadAdminData(); }
+                    else { const err = await res.json(); showToast(err.message || 'Fehler.', false); }
+                } catch (error) { showToast('Netzwerkfehler.', false); }
+            }
+        }
+    });
+
+    // Start
     loadFiles();
 });

@@ -1,4 +1,4 @@
-// server.js (überarbeitet)
+// server.js (überarbeitet und final)
 
 const express = require('express');
 const http = require('http');
@@ -103,7 +103,7 @@ function decrypt(encryptedData, iv) {
 }
 
 // Authentifizierungs-Middleware
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
         console.warn(`Autorisierungsfehler: Kein Token vorhanden für ${req.originalUrl}`);
@@ -111,13 +111,26 @@ const authMiddleware = (req, res, next) => {
     }
     try {
         const verified = jwt.verify(token, JWT_SECRET);
-        req.user = verified;
-        console.log(`Token verifiziert. Benutzer-ID: ${req.user.id}`);
+        req.user = await User.findById(verified.id).select('-password');
+        if (!req.user) {
+            console.warn('Benutzer nicht gefunden oder gelöscht');
+            return res.status(401).send('Zugriff verweigert.');
+        }
+        console.log(`Token verifiziert. Benutzer-ID: ${req.user._id}`);
         next();
     } catch (err) {
         console.error(`Ungültiger Token: ${err.message}`);
         res.status(400).send('Ungültiger Token.');
     }
+};
+
+// Admin-Middleware
+const adminMiddleware = (req, res, next) => {
+    if (!req.user || !req.user.isAdmin) {
+        console.warn(`Admin-Zugriff verweigert für Benutzer-ID: ${req.user?._id}`);
+        return res.status(403).json({ message: 'Admin-Zugriff verweigert.' });
+    }
+    next();
 };
 
 // --- Express-Routen ---
@@ -127,11 +140,6 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.ht
 app.get('/login', (req, res) => res.sendFile(path.join(__dirname, 'public', 'login.html')));
 app.get('/register', (req, res) => res.sendFile(path.join(__dirname, 'public', 'register.html')));
 app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 'dashboard.html')));
-
-// Logout-Route
-app.get('/api/logout', (req, res) => {
-    res.status(200).json({ message: 'Erfolgreich abgemeldet.' });
-});
 
 // Registrierung
 app.post('/api/register', async (req, res) => {
@@ -166,49 +174,82 @@ app.post('/api/login', loginLimiter, async (req, res) => {
         }
         const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
         console.log(`Login erfolgreich für E-Mail: ${email}. Token erstellt.`);
-        res.status(200).json({ message: 'Anmeldung erfolgreich', token, username: user.username });
+        res.status(200).json({ message: 'Anmeldung erfolgreich', token, username: user.username, isAdmin: user.isAdmin });
     } catch (err) {
         console.error(`Login-Fehler für E-Mail: ${email}. Fehler: ${err.message}`);
         res.status(500).json({ message: 'Serverfehler' });
     }
 });
 
-// Routen für verschlüsselte Dateien (geschützt durch Middleware)
+// --- Routen für den Benutzer-Account ---
+app.get('/api/account', authMiddleware, async (req, res) => {
+    res.status(200).json({
+        username: req.user.username,
+        email: req.user.email,
+        isAdmin: req.user.isAdmin
+    });
+});
+
+app.put('/api/account/password', authMiddleware, async (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    try {
+        const user = await User.findById(req.user._id);
+        if (!(await user.comparePassword(oldPassword))) {
+            return res.status(401).json({ message: 'Altes Passwort ist falsch.' });
+        }
+        if (!validatePassword(newPassword)) {
+            return res.status(400).json({
+                message: 'Das neue Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen enthalten.'
+            });
+        }
+        user.password = newPassword;
+        await user.save();
+        res.status(200).json({ message: 'Passwort erfolgreich geändert.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Passwortänderung fehlgeschlagen.', error: err.message });
+    }
+});
+
+app.delete('/api/account', authMiddleware, async (req, res) => {
+    try {
+        await User.deleteOne({ _id: req.user._id });
+        await File.deleteMany({ userId: req.user._id });
+        res.status(200).json({ message: 'Account und alle Daten erfolgreich gelöscht.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Account-Löschung fehlgeschlagen.', error: err.message });
+    }
+});
+
+// --- Routen für verschlüsselte Dateien ---
 app.post('/api/files', authMiddleware, async (req, res) => {
     const { title, content } = req.body;
-    console.log(`Speicher-Versuch für Benutzer-ID: ${req.user.id}, Titel: "${title}"`);
     try {
         const encryptedData = encrypt(content);
         const file = new File({
-            userId: req.user.id,
+            userId: req.user._id,
             title,
             iv: encryptedData.iv,
             content: encryptedData.encryptedData
         });
         await file.save();
-        console.log(`Datei erfolgreich gespeichert. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(201).json({ message: 'Datei erfolgreich gespeichert.' });
     } catch (err) {
-        console.error(`Speichern fehlgeschlagen. Benutzer-ID: ${req.user.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Speichern fehlgeschlagen', error: err.message });
     }
 });
 
 app.put('/api/files/:id', authMiddleware, async (req, res) => {
-    const { title, content, message } = req.body;
-    console.log(`Aktualisierungsversuch für Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
+    const { title, content } = req.body;
     try {
-        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
         if (!file) {
-            console.warn(`Aktualisierung fehlgeschlagen: Datei nicht gefunden. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
             return res.status(404).json({ message: 'Datei nicht gefunden.' });
         }
 
-        // Speichere die aktuelle Version im Verlauf
         file.history.push({
             content: file.content,
             iv: file.iv,
-            message: message || 'Änderung ohne Nachricht'
+            message: 'Änderung ohne Nachricht'
         });
 
         const encryptedData = encrypt(content);
@@ -217,18 +258,15 @@ app.put('/api/files/:id', authMiddleware, async (req, res) => {
         file.iv = encryptedData.iv;
         await file.save();
 
-        console.log(`Datei erfolgreich aktualisiert. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(200).json({ message: 'Datei erfolgreich aktualisiert.' });
     } catch (err) {
-        console.error(`Aktualisierung fehlgeschlagen. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Aktualisierung fehlgeschlagen', error: err.message });
     }
 });
 
-// NEUE ROUTE: Dateiverlauf abrufen
 app.get('/api/files/:id/history', authMiddleware, async (req, res) => {
     try {
-        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
         if (!file) {
             return res.status(404).json({ message: 'Datei nicht gefunden.' });
         }
@@ -243,18 +281,16 @@ app.get('/api/files/:id/history', authMiddleware, async (req, res) => {
     }
 });
 
-// NEUE ROUTE: Datei auf eine alte Version zurücksetzen
 app.put('/api/files/:id/revert', authMiddleware, async (req, res) => {
     const { historyIndex } = req.body;
     try {
-        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
         if (!file || !file.history[historyIndex]) {
             return res.status(404).json({ message: 'Datei oder Version nicht gefunden.' });
         }
 
         const oldVersion = file.history[historyIndex];
 
-        // Speichere die aktuelle Version im Verlauf, bevor du zurücksetzt
         file.history.push({
             content: file.content,
             iv: file.iv,
@@ -272,37 +308,109 @@ app.put('/api/files/:id/revert', authMiddleware, async (req, res) => {
 });
 
 app.get('/api/files', authMiddleware, async (req, res) => {
-    console.log(`Abrufversuch für Dateien von Benutzer-ID: ${req.user.id}`);
     try {
-        const files = await File.find({ userId: req.user.id });
+        const files = await File.find({ userId: req.user._id });
         const decryptedFiles = files.map(file => ({
             _id: file._id,
             title: file.title,
             createdAt: file.createdAt,
             content: decrypt(file.content, file.iv)
         }));
-        console.log(`${decryptedFiles.length} Dateien erfolgreich für Benutzer-ID ${req.user.id} abgerufen.`);
         res.status(200).json(decryptedFiles);
     } catch (err) {
-        console.error(`Abrufen der Dateien fehlgeschlagen. Benutzer-ID: ${req.user.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Abrufen fehlgeschlagen', error: err.message });
     }
 });
 
 app.delete('/api/files/:id', authMiddleware, async (req, res) => {
-    console.log(`Löschversuch für Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
     try {
-        const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
+        const file = await File.findOne({ _id: req.params.id, userId: req.user._id });
         if (!file) {
-            console.warn(`Löschen fehlgeschlagen: Datei nicht gefunden. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
             return res.status(404).json({ message: 'Datei nicht gefunden.' });
         }
         await file.deleteOne();
-        console.log(`Datei erfolgreich gelöscht. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(200).json({ message: 'Datei erfolgreich gelöscht.' });
     } catch (err) {
-        console.error(`Löschen fehlgeschlagen. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Löschen fehlgeschlagen', error: err.message });
+    }
+});
+
+// --- Admin-Routen ---
+app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const userCount = await User.countDocuments();
+        const fileCount = await File.countDocuments();
+        res.status(200).json({ userCount, fileCount });
+    } catch (err) {
+        res.status(500).json({ message: 'Statistiken abrufen fehlgeschlagen.' });
+    }
+});
+
+app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const users = await User.find().select('-password');
+        res.status(200).json(users);
+    } catch (err) {
+        res.status(500).json({ message: 'Benutzerliste abrufen fehlgeschlagen.' });
+    }
+});
+
+app.put('/api/admin/users/:id/password', authMiddleware, adminMiddleware, async (req, res) => {
+    const { newPassword } = req.body;
+    if (!validatePassword(newPassword)) {
+        return res.status(400).json({
+            message: 'Das neue Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen enthalten.'
+        });
+    }
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'Benutzer nicht gefunden.' });
+        }
+        user.password = newPassword;
+        await user.save();
+        res.status(200).json({ message: 'Passwort erfolgreich geändert.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Passwortänderung fehlgeschlagen.', error: err.message });
+    }
+});
+
+app.delete('/api/admin/users/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        await User.deleteOne({ _id: req.params.id });
+        await File.deleteMany({ userId: req.params.id });
+        res.status(200).json({ message: 'Benutzer und alle Daten gelöscht.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Löschung fehlgeschlagen.', error: err.message });
+    }
+});
+
+app.get('/api/admin/files', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const files = await File.find().populate('userId', 'username email');
+        const fileData = files.map(file => ({
+            _id: file._id,
+            title: file.title,
+            username: file.userId.username,
+            email: file.userId.email,
+            createdAt: file.createdAt
+        }));
+        res.status(200).json(fileData);
+    } catch (err) {
+        res.status(500).json({ message: 'Dateiliste abrufen fehlgeschlagen.', error: err.message });
+    }
+});
+
+app.delete('/api/admin/files/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const file = await File.findById(req.params.id);
+        if (!file) {
+            return res.status(404).json({ message: 'Datei nicht gefunden.' });
+        }
+        await file.deleteOne();
+        res.status(200).json({ message: 'Datei erfolgreich gelöscht.' });
+    } catch (err) {
+        res.status(500).json({ message: 'Löschung fehlgeschlagen.', error: err.message });
     }
 });
 

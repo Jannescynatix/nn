@@ -1,4 +1,4 @@
-/* public/css/dashboard-style.css (überarbeitet) */
+/* public/css/dashboard-style.css (überarbeitet und final) */
 
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
 
@@ -39,6 +39,7 @@ body {
     position: sticky;
     top: 0;
     height: 100vh;
+    box-sizing: border-box;
 }
 
 .user-info {
@@ -58,11 +59,15 @@ body {
     margin: 0;
     font-weight: 500;
 }
+.user-info small {
+    color: var(--secondary-text-color);
+}
 
 .main-nav {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    flex-grow: 1;
 }
 
 .nav-item {
@@ -86,9 +91,43 @@ body {
     text-align: center;
 }
 
+.logout-container {
+    margin-top: 20px;
+}
+
+#logout-button {
+    background-color: var(--border-color);
+    color: var(--text-color);
+    border: none;
+    padding: 12px 20px;
+    border-radius: 6px;
+    font-size: 16px;
+    cursor: pointer;
+    width: 100%;
+    transition: background-color 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+#logout-button:hover {
+    background-color: #444;
+}
+#logout-button i {
+    margin-right: 10px;
+}
+
 .main-content {
     flex-grow: 1;
     padding: 30px;
+    display: flex;
+    flex-direction: column;
+}
+
+.view {
+    display: none;
+}
+.view.active {
+    display: block;
 }
 
 .main-header {
@@ -132,33 +171,46 @@ body {
     border-color: var(--primary-color);
 }
 
-.file-list-section {
-    max-width: 900px;
-    margin: 0 auto;
+.content-wrapper {
+    display: flex;
+    gap: 30px;
 }
 
-.file-form {
+.file-creation-area, .file-list-area {
     background-color: var(--card-bg-color);
     padding: 20px;
     border-radius: 8px;
     border: 1px solid var(--border-color);
-    margin-bottom: 25px;
+    flex: 1;
+}
+
+.file-creation-area {
+    min-width: 400px;
+}
+.file-list-area {
+    min-width: 300px;
+}
+
+.file-creation-area h3, .file-list-area h3 {
+    margin-top: 0;
+}
+
+.file-form {
     display: flex;
     flex-direction: column;
     gap: 15px;
 }
 
 .file-form input[type="text"],
-.file-form textarea {
+.file-form textarea,
+.file-list-area .file-card {
     background-color: var(--sidebar-bg-color);
     color: var(--text-color);
-    padding: 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
     font-size: 16px;
     width: 100%;
     box-sizing: border-box;
-    transition: border-color 0.3s ease;
 }
 
 .file-form input:focus,
@@ -167,9 +219,11 @@ body {
     border-color: var(--primary-color);
 }
 
+.file-form input { padding: 12px; }
 .file-form textarea {
+    padding: 12px;
     resize: vertical;
-    min-height: 100px;
+    min-height: 200px;
 }
 
 .form-actions {
@@ -177,8 +231,7 @@ body {
     gap: 10px;
 }
 
-.form-actions button {
-    flex-grow: 1;
+button.btn, .form-actions button {
     background-color: var(--primary-color);
     color: #fff;
     border: none;
@@ -189,7 +242,7 @@ body {
     transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-.form-actions button:hover {
+button.btn:hover, .form-actions button:hover {
     background-color: #0077e6;
     transform: translateY(-1px);
 }
@@ -197,16 +250,12 @@ body {
 #new-file-btn {
     background-color: var(--secondary-text-color);
 }
-
 #new-file-btn:hover {
     background-color: #6a737d;
 }
 
 .file-card {
-    background-color: var(--card-bg-color);
-    padding: 20px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
+    padding: 15px;
     margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
@@ -214,48 +263,65 @@ body {
     transition: background-color 0.3s ease, transform 0.2s ease;
     cursor: pointer;
 }
-
 .file-card:hover {
     background-color: var(--hover-bg-color);
     transform: translateY(-2px);
 }
-
 .file-card h3 {
     margin: 0;
     font-size: 18px;
     color: var(--primary-color);
 }
-
 .file-card p {
     margin: 5px 0;
     color: var(--secondary-text-color);
     font-size: 14px;
 }
-
-.file-actions {
+.file-card .file-actions {
     display: flex;
     gap: 10px;
 }
-
-.file-actions button {
+.file-card .file-actions button {
     font-size: 14px;
     padding: 8px 12px;
 }
 
-.edit-btn {
-    background-color: #e7c24f;
-}
+.edit-btn { background-color: #e7c24f; }
+.edit-btn:hover { background-color: #d1b142; }
+.delete-btn, .danger-btn { background-color: var(--danger-color); }
+.delete-btn:hover, .danger-btn:hover { background-color: #b93232; }
 
-.edit-btn:hover {
-    background-color: #d1b142;
+/* Einstellungen & Admin-Bereich */
+.settings-content, .admin-content {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
 }
-
-.delete-btn {
-    background-color: var(--danger-color);
+.setting-card, .admin-card {
+    background-color: var(--card-bg-color);
+    padding: 20px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
 }
-
-.delete-btn:hover {
-    background-color: #b93232;
+.settings-content h3, .admin-content h3 {
+    margin-top: 0;
+    color: var(--primary-color);
+}
+.form-horizontal label {
+    display: block;
+    margin-bottom: 5px;
+}
+.form-group {
+    margin-bottom: 15px;
+}
+.form-horizontal input {
+    width: 100%;
+    background-color: var(--sidebar-bg-color);
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 6px;
+    box-sizing: border-box;
 }
 
 /* Modale Fenster */
@@ -274,24 +340,15 @@ body {
     justify-content: center;
     align-items: center;
 }
-
 .modal-content {
     background-color: var(--card-bg-color);
-    margin: auto;
     padding: 30px;
     border: 1px solid var(--border-color);
     border-radius: 8px;
     width: 90%;
     max-width: 700px;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
-    animation: zoom-in 0.3s ease;
 }
-
-@keyframes zoom-in {
-    from { transform: scale(0.9); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
-}
-
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -300,66 +357,68 @@ body {
     padding-bottom: 10px;
     margin-bottom: 20px;
 }
-
-.modal-header h2 {
-    margin: 0;
-    color: var(--primary-color);
-}
-
-.modal-body p {
-    white-space: pre-wrap;
-    max-height: 400px;
-    overflow-y: auto;
-    border: 1px solid var(--border-color);
-    padding: 10px;
-    border-radius: 4px;
-    background-color: #010409;
-}
-
-.modal-body ul {
-    list-style: none;
-    padding: 0;
-    margin: 0;
-}
-
-.history-item {
-    background-color: #010409;
-    padding: 15px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    margin-bottom: 10px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.history-item p {
-    margin: 0;
-}
-
-.revert-btn {
-    background-color: #28a745;
-}
-
-.revert-btn:hover {
-    background-color: #218838;
-}
-
-.modal-actions {
-    margin-top: 20px;
-    display: flex;
-    gap: 10px;
-    justify-content: flex-end;
-}
-
 .close-btn {
     color: var(--secondary-text-color);
     font-size: 28px;
     font-weight: bold;
     cursor: pointer;
-    transition: color 0.3s ease;
 }
+.close-btn:hover { color: #fff; }
 
-.close-btn:hover {
-    color: #fff;
+.history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--sidebar-bg-color);
+    border: 1px solid var(--border-color);
+    padding: 10px;
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+.revert-btn { background-color: #28a745; }
+.revert-btn:hover { background-color: #218838; }
+
+.stats-cards {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+.stat-card {
+    flex: 1;
+    text-align: center;
+    padding: 20px;
+    background-color: var(--card-bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+.stat-card p {
+    font-size: 40px;
+    margin: 10px 0 0;
+    font-weight: 700;
+    color: var(--primary-color);
+}
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+}
+.admin-table th, .admin-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+.admin-table th {
+    background-color: #010409;
+    color: var(--secondary-text-color);
+}
+.admin-table tbody tr:hover {
+    background-color: var(--hover-bg-color);
+}
+.admin-table .btn {
+    padding: 6px 10px;
+    font-size: 14px;
+}
+.table-actions {
+    display: flex;
+    gap: 5px;
 }
