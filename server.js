@@ -6,10 +6,10 @@ const mongoose = require('mongoose');
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const User = require('./models/User');
-const Chat = require('./models/Chat');
-const Group = require('./models/Group');
-const Report = require('./models/Report');
+const User = require('./public/User');
+const Chat = require('./public/Chat');
+const Group = require('./public/Group');
+const Report = require('./public/Report');
 
 const app = express();
 const server = http.createServer(app);
