@@ -1,257 +1,257 @@
+// server.js
+
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
-const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+const session = require('express-session');
+const sharedsession = require('express-socket.io-session');
+const mongoose = require('mongoose');
 require('dotenv').config();
 
-const User = require('./models/User');
-const Chat = require('./models/Chat');
-const Group = require('./models/Group');
-const Report = require('./models/Report');
+const User = require('./database/models/User');
+const Chat = require('./database/models/Chat');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
+const sessionMiddleware = session({
+    secret: process.env.SESSION_SECRET || 'EinGeheimesSchluesselWort',
+    resave: false,
+    saveUninitialized: true,
+    cookie: { secure: 'auto' }
+});
 
+app.use(sessionMiddleware);
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
-mongoose.connect(process.env.MONGO_URI)
-    .then(() => console.log('MongoDB verbunden'))
-    .catch(err => console.log(err));
+const io = socketIo(server);
+io.use(sharedsession(sessionMiddleware, {
+    autoSave: true
+}));
 
-const authMiddleware = (socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token) {
-        return next(new Error('Nicht autorisiert: Kein Token vorhanden.'));
-    }
+const ADMIN_PASSWORD_HASH = process.env.ADMIN_PASSWORD_HASH;
+const JWT_SECRET = process.env.JWT_SECRET || 'EinSehrGeheimerJWT-Schlüssel';
+
+// MongoDB-Verbindung
+const connectDB = async () => {
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        socket.userId = decoded.id;
-        next();
-    } catch (error) {
-        next(new Error('Nicht autorisiert: Ungültiger Token.'));
+        await mongoose.connect(process.env.MONGODB_URI);
+        console.log('MongoDB erfolgreich verbunden!');
+    } catch (err) {
+        console.error('MongoDB-Verbindungsfehler:', err.message);
+        process.exit(1);
     }
 };
-io.use(authMiddleware);
+connectDB();
 
-app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
-});
+// --- Express-Routen ---
 
-app.post('/api/auth/register', async (req, res) => {
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
+app.get('/chat', (req, res) => res.sendFile(path.join(__dirname, 'public', 'chat.html')));
+app.get('/admin', (req, res) => req.session.isAdmin ? res.sendFile(path.join(__dirname, 'public', 'admin.html')) : res.sendFile(path.join(__dirname, 'public', 'admin-login.html')));
+
+app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
     try {
-        const userExists = await User.findOne({ username });
-        if (userExists) return res.status(400).json({ message: 'Benutzername existiert bereits.' });
-        const emailExists = await User.findOne({ email });
-        if (emailExists) return res.status(400).json({ message: 'E-Mail existiert bereits.' });
         const user = new User({ username, email, password });
         await user.save();
-        res.status(201).json({ message: 'Registrierung erfolgreich' });
-    } catch (error) {
-        res.status(500).json({ message: 'Registrierung fehlgeschlagen', error });
+        const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
+        res.status(201).json({ token, username: user.username });
+    } catch (err) {
+        res.status(400).json({ message: 'Registrierung fehlgeschlagen', error: err.message });
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
-    const { username, password } = req.body;
+app.post('/api/login', async (req, res) => {
+    const { email, password } = req.body;
     try {
-        const user = await User.findOne({ username });
-        if (!user) return res.status(400).json({ message: 'Benutzer nicht gefunden' });
-        const isMatch = await user.matchPassword(password);
-        if (!isMatch) return res.status(400).json({ message: 'Ungültiges Passwort' });
-        const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1d' });
-        res.status(200).json({ message: 'Login erfolgreich', token, user: { id: user._id, username: user.username } });
-    } catch (error) {
+        const user = await User.findOne({ email });
+        if (!user || !(await user.comparePassword(password))) {
+            return res.status(401).json({ message: 'Falsche E-Mail oder falsches Passwort' });
+        }
+        const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
+        res.status(200).json({ token, username: user.username });
+    } catch (err) {
         res.status(500).json({ message: 'Serverfehler' });
     }
 });
 
-app.get('/api/users/search', async (req, res) => {
-    const { username } = req.query;
-    try {
-        const users = await User.find({ username: new RegExp(username, 'i') }).select('username');
-        res.status(200).json(users);
-    } catch (error) {
-        res.status(500).json({ message: 'Serverfehler' });
+app.post('/admin-login', (req, res) => {
+    const { password } = req.body;
+    if (!ADMIN_PASSWORD_HASH) {
+        return res.status(500).send({ success: false, message: 'Admin-Passwort-Hash ist nicht gesetzt.' });
     }
+    bcrypt.compare(password, ADMIN_PASSWORD_HASH, (err, result) => {
+        if (result === true) {
+            req.session.isAdmin = true;
+            req.session.save();
+            res.status(200).send({ success: true });
+        } else {
+            res.status(401).send({ success: false, message: 'Falsches Passwort.' });
+        }
+    });
 });
+
+// --- Socket.IO Events ---
+
+const getStats = async () => {
+    const totalUsers = await User.countDocuments();
+    const totalChats = await Chat.countDocuments();
+    const reportedMessages = await Chat.countDocuments({ 'messages.reported': true });
+    return {
+        totalUsers,
+        totalChats,
+        reportedMessages
+    };
+};
 
 io.on('connection', (socket) => {
-    console.log(`Benutzer verbunden: ${socket.userId}`);
-    socket.join(socket.userId.toString());
+    console.log('Ein Benutzer hat sich verbunden:', socket.id);
 
-    socket.on('load_chats_and_groups', async () => {
+    socket.on('authenticate', async (token) => {
         try {
-            const user = await User.findById(socket.userId)
-                .populate({ path: 'chats', populate: { path: 'participants', select: 'username' } })
-                .populate({ path: 'groups', populate: { path: 'members', select: 'username' } });
-            socket.emit('chats_loaded', user.chats);
-            socket.emit('groups_loaded', user.groups);
-        } catch (error) {
-            console.error(error);
+            const decoded = jwt.verify(token, JWT_SECRET);
+            const user = await User.findById(decoded.id);
+            if (!user) {
+                return socket.emit('auth-error', 'Benutzer nicht gefunden.');
+            }
+            socket.userId = user._id;
+            socket.username = user.username;
+            socket.join(user._id.toString());
+            socket.emit('authenticated', { username: user.username });
+
+            const userChats = await Chat.find({ participants: user._id }).populate('participants', 'username').populate('messages.sender', 'username');
+            socket.emit('load chats', userChats);
+
+        } catch (err) {
+            socket.emit('auth-error', 'Authentifizierung fehlgeschlagen.');
         }
     });
 
-    socket.on('load_chat_messages', async ({ chatId, chatType }) => {
+    socket.on('send message', async ({ chatId, text }) => {
+        if (!socket.userId) return;
         try {
-            let chat;
-            if (chatType === 'chat') {
-                chat = await Chat.findById(chatId).populate('messages.sender', 'username');
-            } else if (chatType === 'group') {
-                chat = await Group.findById(chatId).populate('messages.sender', 'username');
-            }
-            if (chat) {
-                socket.emit('chat_messages_loaded', chat.messages);
-            }
-        } catch (error) {
-            console.error(error);
-        }
-    });
+            const chat = await Chat.findById(chatId);
+            if (!chat) return;
 
-    socket.on('send_message', async ({ chatId, chatType, content }) => {
-        try {
-            const message = { sender: socket.userId, content };
-            let chat;
-            if (chatType === 'chat') {
-                chat = await Chat.findById(chatId);
-            } else if (chatType === 'group') {
-                chat = await Group.findById(chatId);
-            }
+            const message = { sender: socket.userId, text };
             chat.messages.push(message);
             await chat.save();
-            const sender = await User.findById(socket.userId);
-            const messageWithSender = { ...message, sender: { username: sender.username } };
 
-            chat.participants.forEach(p => io.to(p.toString()).emit('new_message', { chatId, message: messageWithSender }));
-        } catch (error) {
-            console.error(error);
+            io.to(chatId).emit('new message', { chatId, message, senderName: socket.username });
+        } catch (err) {
+            console.error(err);
         }
     });
 
-    socket.on('start_new_chat', async (otherUserId) => {
+    socket.on('create group', async ({ groupName, participants }) => {
+        if (!socket.userId) return;
         try {
-            const existingChat = await Chat.findOne({ participants: { $all: [socket.userId, otherUserId] } });
-            if (existingChat) {
-                return socket.emit('chat_already_exists', { chatId: existingChat._id });
-            }
-            const newChat = new Chat({ participants: [socket.userId, otherUserId] });
-            await newChat.save();
-            await User.findByIdAndUpdate(socket.userId, { $push: { chats: newChat._id } });
-            await User.findByIdAndUpdate(otherUserId, { $push: { chats: newChat._id } });
-            const populatedChat = await Chat.findById(newChat._id).populate('participants', 'username');
-            socket.emit('new_chat_created', populatedChat);
-            io.to(otherUserId.toString()).emit('new_chat_created', populatedChat);
-        } catch (error) {
-            console.error(error);
-        }
-    });
-
-    socket.on('create_group', async ({ name, members }) => {
-        try {
-            const memberIds = [...members.map(m => m._id), socket.userId];
-            const newGroup = new Group({ name, creator: socket.userId, members: memberIds });
+            const participantIds = participants.map(id => mongoose.Types.ObjectId(id));
+            participantIds.push(socket.userId);
+            const newGroup = new Chat({
+                name: groupName,
+                isGroup: true,
+                participants: participantIds,
+                admin: socket.userId,
+                messages: []
+            });
             await newGroup.save();
-            for (const memberId of memberIds) {
-                await User.findByIdAndUpdate(memberId, { $push: { groups: newGroup._id } });
-                io.to(memberId.toString()).emit('new_group_created', newGroup);
-            }
-        } catch (error) {
-            console.error(error);
+
+            newGroup.participants.forEach(pId => io.to(pId.toString()).emit('new chat', newGroup));
+        } catch (err) {
+            console.error(err);
         }
     });
 
-    socket.on('save_message', ({ chatId, chatType, messageId }) => {
-        console.log(`Nachricht ${messageId} in ${chatType} ${chatId} gespeichert`);
-        socket.emit('message_saved');
-    });
-
-    socket.on('delete_message_group', async ({ groupId, messageId }) => {
+    socket.on('report message', async ({ chatId, messageId }) => {
+        if (!socket.userId) return;
         try {
-            const group = await Group.findById(groupId);
-            if (group.creator.toString() === socket.userId.toString()) {
-                group.messages.pull({ _id: messageId });
-                await group.save();
-                group.members.forEach(m => io.to(m.toString()).emit('message_deleted', { chatId: groupId, messageId }));
-            }
-        } catch (error) {
-            console.error(error);
+            await Chat.updateOne(
+                { _id: chatId, 'messages._id': messageId },
+                { '$set': { 'messages.$.reported': true } }
+            );
+            io.to('admin-room').emit('new report');
+        } catch (err) {
+            console.error(err);
         }
     });
 
-    socket.on('report_chat', async ({ chatId, chatType, message }) => {
+    socket.on('delete message', async ({ chatId, messageId }) => {
+        if (!socket.userId) return;
         try {
-            const report = new Report({ reporter: socket.userId, reportedChatId: chatId, reportedChatType: chatType, message });
-            await report.save();
-            const populatedReport = await Report.findById(report._id).populate('reporter', 'username');
-            io.to('admin-room').emit('new_report', populatedReport);
-            socket.emit('report_success', { message: 'Meldung wurde gesendet.' });
-        } catch (error) {
-            socket.emit('report_error', { message: 'Fehler beim Senden der Meldung.' });
+            const chat = await Chat.findById(chatId);
+            if (!chat || (chat.isGroup && chat.admin.toString() !== socket.userId.toString())) {
+                return;
+            }
+
+            const messageToDelete = chat.messages.id(messageId);
+            if (!messageToDelete) return;
+
+            if (chat.isGroup || messageToDelete.sender.toString() === socket.userId.toString()) {
+                messageToDelete.remove();
+                await chat.save();
+                io.to(chatId).emit('message deleted', { chatId, messageId });
+            }
+        } catch (err) {
+            console.error(err);
         }
     });
 
-    socket.on('admin_login', async ({ username, password }) => {
-        if (username === 'admin' && password === process.env.ADMIN_PASSWORD) {
+    // Admin-Events
+    socket.on('admin:check-session', async () => {
+        if (socket.handshake.session && socket.handshake.session.isAdmin) {
             socket.join('admin-room');
-            socket.emit('admin_authenticated');
-            const stats = await getAdminStats();
-            io.to('admin-room').emit('admin_stats', stats);
+            const [users, chats, stats] = await Promise.all([
+                User.find({}, 'username email createdAt'),
+                Chat.find().populate('participants', 'username').populate('messages.sender', 'username'),
+                getStats()
+            ]);
+            socket.emit('admin:authenticated', { users, chats, stats });
         } else {
-            socket.emit('admin_login_failed', { message: 'Falsche Anmeldedaten.' });
+            socket.emit('admin:auth-failed');
         }
     });
 
-    socket.on('admin_get_stats', async () => {
-        if (socket.rooms.has('admin-room')) {
-            const stats = await getAdminStats();
-            socket.emit('admin_stats', stats);
+    socket.on('admin:delete-user', async (userId) => {
+        if (!socket.handshake.session.isAdmin) return;
+        await User.findByIdAndDelete(userId);
+        io.to('admin-room').emit('admin:update', await getAdminData());
+    });
+
+    socket.on('admin:delete-chat', async (chatId) => {
+        if (!socket.handshake.session.isAdmin) return;
+        await Chat.findByIdAndDelete(chatId);
+        io.to('admin-room').emit('admin:update', await getAdminData());
+    });
+
+    socket.on('admin:delete-chat-message', async ({ chatId, messageId }) => {
+        if (!socket.handshake.session.isAdmin) return;
+        const chat = await Chat.findById(chatId);
+        if (chat) {
+            chat.messages.id(messageId).remove();
+            await chat.save();
+            io.to(chatId).emit('message deleted', { chatId, messageId });
+            io.to('admin-room').emit('admin:update', await getAdminData());
         }
     });
 
-    socket.on('admin_delete_group', async (groupId) => {
-        if (socket.rooms.has('admin-room')) {
-            await Group.findByIdAndDelete(groupId);
-            io.to('admin-room').emit('admin_stats_update');
-        }
-    });
-
-    socket.on('admin_delete_chat', async (chatId) => {
-        if (socket.rooms.has('admin-room')) {
-            await Chat.findByIdAndDelete(chatId);
-            io.to('admin-room').emit('admin_stats_update');
-        }
-    });
-
-    socket.on('admin_delete_user', async (userId) => {
-        if (socket.rooms.has('admin-room')) {
-            await User.findByIdAndDelete(userId);
-            io.to('admin-room').emit('admin_stats_update');
-        }
-    });
-
-    socket.on('admin_resolve_report', async (reportId) => {
-        if (socket.rooms.has('admin-room')) {
-            await Report.findByIdAndUpdate(reportId, { isResolved: true });
-            io.to('admin-room').emit('admin_stats_update');
-        }
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Benutzer getrennt:', socket.userId);
+    socket.on('disconnect', async () => {
+        console.log('Benutzer getrennt:', socket.id);
     });
 });
 
-async function getAdminStats() {
-    const users = await User.find();
-    const chats = await Chat.find().populate('participants', 'username');
-    const groups = await Group.find().populate('members', 'username');
-    const reports = await Report.find().populate('reporter', 'username');
-    return { users, chats, groups, reports };
-}
+const getAdminData = async () => {
+    const [users, chats, stats] = await Promise.all([
+        User.find({}, 'username email createdAt'),
+        Chat.find().populate('participants', 'username').populate('messages.sender', 'username'),
+        getStats()
+    ]);
+    return { users, chats, stats };
+};
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server läuft auf Port ${PORT}`));
