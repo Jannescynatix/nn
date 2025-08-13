@@ -1,4 +1,4 @@
-// public/js/auth.js (vollständig überarbeitet)
+// public/js/auth.js (vollständig überarbeitet und korrigiert)
 
 document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('register-form');
@@ -54,6 +54,8 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.status === 200) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
+                localStorage.setItem('isAdmin', data.isAdmin); // <<-- Wichtige korrigierte Zeile
+
                 setTimeout(() => {
                     window.location.href = '/dashboard';
                 }, 1000);
