@@ -1,4 +1,4 @@
-// public/js/dashboard.js
+// public/js/dashboard.js (vollständig überarbeitet)
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
@@ -9,6 +9,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const saveButton = document.getElementById('save-button');
     const logoutButton = document.getElementById('logout-button');
 
+    // Toast-Benachrichtigung für eine schönere UX
+    function showToast(message, isSuccess) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${isSuccess ? 'success' : 'error'}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
+
     if (!token || !username) {
         window.location.href = '/login';
         return;
@@ -18,34 +29,38 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Funktion zum Laden der Dateien
     const loadFiles = async () => {
-        const res = await fetch('/api/files', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
+        try {
+            const res = await fetch('/api/files', {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
 
-        if (res.status === 401) {
-            localStorage.clear();
-            window.location.href = '/login';
-            return;
+            if (res.status === 401) {
+                localStorage.clear();
+                window.location.href = '/login';
+                return;
+            }
+
+            const files = await res.json();
+            fileList.innerHTML = '';
+            files.forEach(file => {
+                const fileCard = document.createElement('div');
+                fileCard.className = 'file-card';
+                fileCard.innerHTML = `
+                    <div>
+                        <h3>${file.title}</h3>
+                        <p>${file.content.substring(0, 50)}...</p>
+                        <small>Erstellt: ${new Date(file.createdAt).toLocaleDateString()}</small>
+                    </div>
+                    <div class="file-actions">
+                        <button class="edit-btn" data-id="${file._id}" data-title="${file.title}" data-content="${file.content}">Bearbeiten</button>
+                        <button class="delete-btn" data-id="${file._id}">Löschen</button>
+                    </div>
+                `;
+                fileList.appendChild(fileCard);
+            });
+        } catch (error) {
+            showToast('Fehler beim Laden der Dateien.', false);
         }
-
-        const files = await res.json();
-        fileList.innerHTML = '';
-        files.forEach(file => {
-            const fileCard = document.createElement('div');
-            fileCard.className = 'file-card';
-            fileCard.innerHTML = `
-                <div>
-                    <h3>${file.title}</h3>
-                    <p>${file.content.substring(0, 50)}...</p>
-                    <small>Erstellt: ${new Date(file.createdAt).toLocaleDateString()}</small>
-                </div>
-                <div class="file-actions">
-                    <button class="edit-btn" data-id="${file._id}" data-title="${file.title}" data-content="${file.content}">Bearbeiten</button>
-                    <button class="delete-btn" data-id="${file._id}">Löschen</button>
-                </div>
-            `;
-            fileList.appendChild(fileCard);
-        });
     };
 
     // Formular zum Speichern/Bearbeiten einer Datei
@@ -55,43 +70,68 @@ document.addEventListener('DOMContentLoaded', async () => {
         const content = fileForm.content.value;
         const fileId = fileIdInput.value;
 
-        let res;
-        if (fileId) {
-            res = await fetch(`/api/files/${fileId}`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ title, content })
-            });
-        } else {
-            res = await fetch('/api/files', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ title, content })
-            });
+        if (!title || !content) {
+            showToast('Titel und Inhalt dürfen nicht leer sein.', false);
+            return;
         }
 
-        await res.json();
-        fileForm.reset();
-        fileIdInput.value = ''; // ID zurücksetzen
-        saveButton.textContent = 'Datei speichern'; // Button-Text zurücksetzen
-        await loadFiles();
+        let res;
+        let method = 'POST';
+        let url = '/api/files';
+        let message = 'Datei erfolgreich gespeichert.';
+
+        if (fileId) {
+            method = 'PUT';
+            url = `/api/files/${fileId}`;
+            message = 'Datei erfolgreich aktualisiert.';
+        }
+
+        try {
+            res = await fetch(url, {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ title, content })
+            });
+
+            if (res.ok) {
+                showToast(message, true);
+                fileForm.reset();
+                fileIdInput.value = '';
+                saveButton.textContent = 'Datei speichern';
+                await loadFiles();
+            } else {
+                const errorData = await res.json();
+                showToast(errorData.message || 'Ein Fehler ist aufgetreten.', false);
+            }
+        } catch (error) {
+            showToast('Netzwerkfehler.', false);
+        }
     });
 
     // Event-Listener für Lösch- und Bearbeitungs-Buttons
     fileList.addEventListener('click', async (e) => {
         if (e.target.classList.contains('delete-btn')) {
             const fileId = e.target.dataset.id;
-            await fetch(`/api/files/${fileId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            await loadFiles();
+            if (confirm('Sind Sie sicher, dass Sie diese Datei löschen möchten?')) {
+                try {
+                    const res = await fetch(`/api/files/${fileId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        showToast('Datei erfolgreich gelöscht.', true);
+                        await loadFiles();
+                    } else {
+                        const errorData = await res.json();
+                        showToast(errorData.message || 'Löschen fehlgeschlagen.', false);
+                    }
+                } catch (error) {
+                    showToast('Netzwerkfehler.', false);
+                }
+            }
         } else if (e.target.classList.contains('edit-btn')) {
             const fileId = e.target.dataset.id;
             const title = e.target.dataset.title;
@@ -100,14 +140,17 @@ document.addEventListener('DOMContentLoaded', async () => {
             fileForm.title.value = title;
             fileForm.content.value = content;
             fileIdInput.value = fileId;
-            saveButton.textContent = 'Änderungen speichern'; // Button-Text anpassen
+            saveButton.textContent = 'Änderungen speichern';
         }
     });
 
     // Logout-Funktion
     logoutButton.addEventListener('click', () => {
         localStorage.clear();
-        window.location.href = '/login';
+        showToast('Erfolgreich abgemeldet.', true);
+        setTimeout(() => {
+            window.location.href = '/login';
+        }, 1000);
     });
 
     loadFiles();

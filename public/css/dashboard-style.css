@@ -1,8 +1,20 @@
-/* public/css/dashboard-style.css */
+/* public/css/dashboard-style.css (vollständig überarbeitet) */
+
+/* Grundlegendes Styling */
+:root {
+    --bg-color: #121212;
+    --card-bg-color: #1e1e1e;
+    --text-color: #e0e0e0;
+    --secondary-text-color: #a0a0a0;
+    --primary-color: #4a90e2;
+    --danger-color: #e24a4a;
+    --success-color: #4ae261;
+}
 
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f2f5;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     margin: 0;
     padding: 0;
     display: flex;
@@ -12,10 +24,10 @@ body {
 }
 
 .container {
-    background-color: #fff;
+    background-color: var(--card-bg-color);
     padding: 30px;
     border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     width: 90%;
     max-width: 800px;
     margin: 20px;
@@ -25,29 +37,78 @@ header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 20px;
 }
 
 h1 {
-    color: #333;
+    color: var(--primary-color);
     margin: 0;
 }
 
-#logout-button {
-    background-color: #dc3545;
+/* Toast-Benachrichtigungen */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+.toast.success {
+    background-color: var(--success-color);
+}
+
+.toast.error {
+    background-color: var(--danger-color);
+}
+
+@keyframes fadein {
+    from {top: 0; opacity: 0;}
+    to {top: 20px; opacity: 1;}
+}
+
+@keyframes fadeout {
+    from {top: 20px; opacity: 1;}
+    to {top: 0; opacity: 0;}
+}
+
+/* Buttons */
+button,
+.btn {
+    background-color: var(--primary-color);
     color: #fff;
     border: none;
-    padding: 10px 15px;
+    padding: 12px 20px;
     border-radius: 6px;
-    font-size: 14px;
+    font-size: 16px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button:hover,
+.btn:hover {
+    background-color: #3b74b6;
+    transform: translateY(-2px);
+}
+
+#logout-button {
+    background-color: #333;
+    color: #fff;
+    padding: 10px 15px;
 }
 
 #logout-button:hover {
-    background-color: #c82333;
+    background-color: #555;
 }
 
+/* Formular */
 .file-form {
     display: flex;
     flex-direction: column;
@@ -57,12 +118,21 @@ h1 {
 
 .file-form input[type="text"],
 .file-form textarea {
+    background-color: #2a2a2a;
+    color: var(--text-color);
     padding: 12px;
-    border: 1px solid #ccc;
+    border: 1px solid #444;
     border-radius: 6px;
     font-size: 16px;
     width: 100%;
     box-sizing: border-box;
+    transition: border-color 0.3s ease;
+}
+
+.file-form input:focus,
+.file-form textarea:focus {
+    outline: none;
+    border-color: var(--primary-color);
 }
 
 .file-form textarea {
@@ -70,46 +140,37 @@ h1 {
     min-height: 100px;
 }
 
-.file-form button {
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    padding: 12px 20px;
-    border-radius: 6px;
-    font-size: 16px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.file-form button:hover {
-    background-color: #0056b3;
-}
-
+/* Dateiliste */
 #file-list-container h2 {
-    color: #555;
+    color: var(--text-color);
     margin-bottom: 15px;
 }
 
 .file-card {
-    background-color: #f9f9f9;
+    background-color: #2a2a2a;
     padding: 15px;
-    border: 1px solid #ddd;
+    border: 1px solid #333;
     border-radius: 6px;
     margin-bottom: 10px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    transition: background-color 0.3s ease;
+}
+
+.file-card:hover {
+    background-color: #3a3a3a;
 }
 
 .file-card h3 {
     margin: 0;
     font-size: 18px;
-    color: #007bff;
+    color: var(--primary-color);
 }
 
 .file-card p {
     margin: 5px 0;
-    color: #666;
+    color: var(--secondary-text-color);
     font-size: 14px;
 }
 
@@ -119,26 +180,22 @@ h1 {
 }
 
 .file-actions button {
-    color: #fff;
-    border: none;
+    font-size: 14px;
     padding: 8px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
 }
 
 .edit-btn {
-    background-color: #ffc107;
+    background-color: #e7c24f;
 }
 
 .edit-btn:hover {
-    background-color: #e0a800;
+    background-color: #d1b142;
 }
 
 .delete-btn {
-    background-color: #dc3545;
+    background-color: var(--danger-color);
 }
 
 .delete-btn:hover {
-    background-color: #c82333;
+    background-color: #b93232;
 }

@@ -1,8 +1,17 @@
-/* public/css/style.css */
+/* public/css/style.css (vollständig überarbeitet) */
+
+:root {
+    --bg-color: #121212;
+    --card-bg-color: #1e1e1e;
+    --text-color: #e0e0e0;
+    --link-color: #4a90e2;
+    --primary-color: #4a90e2;
+}
 
 body {
-    font-family: Arial, sans-serif;
-    background-color: #f0f2f5;
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color);
     margin: 0;
     display: flex;
     justify-content: center;
@@ -11,22 +20,22 @@ body {
 }
 
 .auth-container {
-    background-color: #fff;
+    background-color: var(--card-bg-color);
     padding: 40px;
     border-radius: 8px;
-    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     width: 100%;
     max-width: 400px;
     text-align: center;
 }
 
 h1 {
-    color: #333;
+    color: var(--primary-color);
     margin-bottom: 20px;
 }
 
 p {
-    color: #666;
+    color: var(--text-color);
     margin-bottom: 25px;
 }
 
@@ -37,25 +46,36 @@ p {
 }
 
 .auth-container input {
+    background-color: #2a2a2a;
+    color: var(--text-color);
     padding: 12px;
-    border: 1px solid #ccc;
+    border: 1px solid #444;
     border-radius: 6px;
     font-size: 16px;
+    transition: border-color 0.3s ease;
 }
 
-.auth-container button {
-    background-color: #007bff;
+.auth-container input:focus {
+    outline: none;
+    border-color: var(--primary-color);
+}
+
+.auth-container button,
+.btn {
+    background-color: var(--primary-color);
     color: #fff;
     border: none;
     padding: 12px 20px;
     border-radius: 6px;
     font-size: 16px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    transition: background-color 0.3s ease, transform 0.2s ease;
 }
 
-.auth-container button:hover {
-    background-color: #0056b3;
+.auth-container button:hover,
+.btn:hover {
+    background-color: #3b74b6;
+    transform: translateY(-2px);
 }
 
 .auth-links {
@@ -68,12 +88,41 @@ p {
 .auth-links .btn {
     text-decoration: none;
     color: #fff;
-    background-color: #007bff;
+    background-color: var(--primary-color);
     padding: 12px 20px;
     border-radius: 6px;
-    transition: background-color 0.3s ease;
 }
 
 .auth-links .btn:hover {
-    background-color: #0056b3;
+    background-color: #3b74b6;
+}
+
+.auth-container a {
+    color: var(--link-color);
+    text-decoration: none;
+}
+
+.auth-container a:hover {
+    text-decoration: underline;
+}
+
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 15px 25px;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    animation: fadein 0.5s, fadeout 0.5s 2.5s;
+}
+
+.toast.success {
+    background-color: #4ae261;
+}
+
+.toast.error {
+    background-color: #e24a4a;
 }

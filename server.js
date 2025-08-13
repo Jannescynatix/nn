@@ -1,4 +1,4 @@
-// server.js
+// server.js (vollständig überarbeitet)
 
 const express = require('express');
 const http = require('http');
@@ -143,7 +143,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
             return res.status(401).json({ message: 'Falsche E-Mail oder falsches Passwort' });
         }
         const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
-        res.status(200).json({ token, username: user.username });
+        res.status(200).json({ message: 'Anmeldung erfolgreich', token, username: user.username });
     } catch (err) {
         res.status(500).json({ message: 'Serverfehler' });
     }

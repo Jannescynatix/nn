@@ -1,8 +1,18 @@
-// public/js/auth.js
+// public/js/auth.js (vollständig überarbeitet)
 
 document.addEventListener('DOMContentLoaded', () => {
     const registerForm = document.getElementById('register-form');
     const loginForm = document.getElementById('login-form');
+
+    function showToast(message, isSuccess) {
+        const toast = document.createElement('div');
+        toast.className = `toast ${isSuccess ? 'success' : 'error'}`;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => {
+            toast.remove();
+        }, 3000);
+    }
 
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
@@ -18,9 +28,11 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const data = await res.json();
-            alert(data.message);
+            showToast(data.message, res.status === 201);
             if (res.status === 201) {
-                window.location.href = '/login';
+                setTimeout(() => {
+                    window.location.href = '/login';
+                }, 1000);
             }
         });
     }
@@ -38,11 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             const data = await res.json();
-            alert(data.message);
+            showToast(data.message, res.status === 200);
             if (res.status === 200) {
                 localStorage.setItem('token', data.token);
                 localStorage.setItem('username', data.username);
-                window.location.href = '/dashboard';
+                setTimeout(() => {
+                    window.location.href = '/dashboard';
+                }, 1000);
             }
         });
     }
