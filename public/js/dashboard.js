@@ -1,11 +1,11 @@
-// public/js/dashboard.js (überarbeitet und final)
+// public/js/dashboard.js (final, bereinigt und korrigiert)
 
 document.addEventListener('DOMContentLoaded', async () => {
     const token = localStorage.getItem('token');
     const username = localStorage.getItem('username');
     const isAdmin = localStorage.getItem('isAdmin') === 'true';
 
-    // UI-Elemente
+    // --- UI-Elemente ---
     const welcomeMessage = document.getElementById('welcome-message');
     const userEmail = document.getElementById('user-email');
     const navItems = document.querySelectorAll('.nav-item');
@@ -42,76 +42,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     let allFiles = [];
 
     // --- Hilfsfunktionen ---
-    function showToast(message, isSuccess) {
+    const showToast = (message, isSuccess) => {
         const toast = document.createElement('div');
         toast.className = `toast ${isSuccess ? 'success' : 'error'}`;
         toast.textContent = message;
         document.body.appendChild(toast);
         setTimeout(() => toast.remove(), 3000);
-    }
-
-    // --- Routing & Navigation ---
-    const showView = (viewId) => {
-        views.forEach(view => {
-            view.classList.remove('active');
-            view.style.display = 'none';
-        });
-        const activeView = document.getElementById(viewId);
-        if (activeView) {
-            activeView.classList.add('active');
-            activeView.style.display = 'block';
-        }
-        navItems.forEach(item => {
-            if (item.dataset.view === viewId.replace('-view', '')) {
-                item.classList.add('active');
-            } else {
-                item.classList.remove('active');
-            }
-        });
     };
 
-    const handleNavigation = (view) => {
-        showView(`${view}-view`);
-        if (view === 'files') loadFiles();
-        if (view === 'settings') loadUserSettings();
-        if (view === 'admin') loadAdminData();
-    };
-
-    navItems.forEach(item => {
-        item.addEventListener('click', (e) => {
-            e.preventDefault();
-            handleNavigation(e.currentTarget.dataset.view);
-        });
-    });
-
-    if (window.location.hash) {
-        const view = window.location.hash.substring(1);
-        handleNavigation(view);
-    } else {
-        handleNavigation('files');
-    }
-
-    // --- Allgemeine Logik ---
-    if (!token || !username) {
-        window.location.href = '/login';
-        return;
-    }
-
-    if (isAdmin) {
-        adminLink.style.display = 'flex';
-    }
-
-    welcomeMessage.textContent = username;
-
-    logoutButton.addEventListener('click', () => {
-        localStorage.clear();
-        showToast('Erfolgreich abgemeldet.', true);
-        setTimeout(() => {
-            window.location.href = '/login';
-        }, 1000);
-    });
-
-    // --- Dateien-Logik ---
+    // --- Dateiverwaltungs-Funktionen ---
     const loadFiles = async () => {
         try {
             const res = await fetch('/api/files', { headers: { 'Authorization': `Bearer ${token}` } });
@@ -157,6 +96,137 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
+    // --- Einstellungs-Funktionen ---
+    const loadUserSettings = async () => {
+        try {
+            const res = await fetch('/api/account', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const user = await res.json();
+                settingsUsername.textContent = user.username;
+                settingsEmail.textContent = user.email;
+                userEmail.textContent = user.email;
+            } else {
+                showToast('Fehler beim Laden der Account-Daten.', false);
+            }
+        } catch (error) {
+            showToast('Netzwerkfehler.', false);
+        }
+    };
+
+    // --- Admin-Funktionen ---
+    const loadAdminData = async () => {
+        if (!isAdmin) return;
+        try {
+            const statsRes = await fetch('/api/admin/stats', { headers: { 'Authorization': `Bearer ${token}` } });
+            const stats = await statsRes.json();
+            adminStatsUsers.textContent = stats.userCount;
+            adminStatsFiles.textContent = stats.fileCount;
+
+            const usersRes = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
+            const users = await usersRes.json();
+            renderAdminUsers(users);
+
+            const filesRes = await fetch('/api/admin/files', { headers: { 'Authorization': `Bearer ${token}` } });
+            const files = await filesRes.json();
+            renderAdminFiles(files);
+        } catch (error) {
+            showToast('Fehler beim Laden der Admin-Daten.', false);
+        }
+    };
+
+    const renderAdminUsers = (users) => {
+        let html = `<table class="admin-table"><thead><tr><th>Username</th><th>E-Mail</th><th>Admin</th><th>Aktionen</th></tr></thead><tbody>`;
+        users.forEach(user => {
+            html += `
+                <tr>
+                    <td>${user.username}</td>
+                    <td>${user.email}</td>
+                    <td>${user.isAdmin ? 'Ja' : 'Nein'}</td>
+                    <td class="table-actions">
+                        <button class="btn reset-password-btn" data-id="${user._id}">Passwort</button>
+                        <button class="btn danger-btn delete-user-btn" data-id="${user._id}">Löschen</button>
+                    </td>
+                </tr>`;
+        });
+        html += `</tbody></table>`;
+        adminUserList.innerHTML = html;
+    };
+
+    const renderAdminFiles = (files) => {
+        let html = `<table class="admin-table"><thead><tr><th>Titel</th><th>Besitzer</th><th>Erstellt</th><th>Aktionen</th></tr></thead><tbody>`;
+        files.forEach(file => {
+            html += `
+                <tr>
+                    <td>${file.title}</td>
+                    <td>${file.username} (${file.email})</td>
+                    <td>${new Date(file.createdAt).toLocaleDateString()}</td>
+                    <td class="table-actions">
+                        <button class="btn danger-btn delete-admin-file-btn" data-id="${file._id}">Löschen</button>
+                    </td>
+                </tr>`;
+        });
+        html += `</tbody></table>`;
+        adminFileList.innerHTML = html;
+    };
+
+    // --- Event-Handler ---
+    const showView = (viewId) => {
+        views.forEach(view => {
+            view.classList.remove('active');
+            view.style.display = 'none';
+        });
+        const activeView = document.getElementById(viewId);
+        if (activeView) {
+            activeView.classList.add('active');
+            activeView.style.display = 'block';
+        }
+        navItems.forEach(item => {
+            if (item.dataset.view === viewId.replace('-view', '')) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    };
+
+    const handleNavigation = (view) => {
+        showView(`${view}-view`);
+        if (view === 'files') loadFiles();
+        if (view === 'settings') loadUserSettings();
+        if (view === 'admin') loadAdminData();
+    };
+
+    // --- Initialisierung ---
+    if (!token || !username) {
+        window.location.href = '/login';
+        return;
+    }
+
+    if (isAdmin) {
+        adminLink.style.display = 'flex';
+    }
+    welcomeMessage.textContent = username;
+
+    navItems.forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            handleNavigation(e.currentTarget.dataset.view);
+        });
+    });
+
+    if (window.location.hash) {
+        const view = window.location.hash.substring(1);
+        handleNavigation(view);
+    } else {
+        handleNavigation('files');
+    }
+
+    logoutButton.addEventListener('click', () => {
+        localStorage.clear();
+        showToast('Erfolgreich abgemeldet.', true);
+        setTimeout(() => { window.location.href = '/login'; }, 1000);
+    });
+
     fileForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const title = titleInput.value;
@@ -190,6 +260,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         const fileCard = e.target.closest('.file-card');
         if (!fileCard) return;
         const fileId = fileCard.dataset.id;
+        const file = allFiles.find(f => f._id === fileId);
+
         if (e.target.classList.contains('delete-btn')) {
             if (confirm('Sicher löschen?')) {
                 try {
@@ -199,16 +271,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 } catch (error) { showToast('Netzwerkfehler.', false); }
             }
         } else if (e.target.classList.contains('edit-btn')) {
-            const file = allFiles.find(f => f._id === fileId);
             if (file) {
                 titleInput.value = file.title;
                 contentInput.value = file.content;
                 fileIdInput.value = file._id;
                 saveButton.textContent = 'Änderungen speichern';
-                document.documentElement.scrollTop = 0; // Nach oben scrollen
+                document.documentElement.scrollTop = 0;
             }
         } else if (e.target.classList.contains('history-btn')) {
-            const file = allFiles.find(f => f._id === fileId);
             if (file) {
                 await loadHistory(file._id);
             }
@@ -230,7 +300,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         saveButton.textContent = 'Datei speichern';
     });
 
-    // --- Dateiverlauf-Logik ---
     const loadHistory = async (fileId) => {
         try {
             const res = await fetch(`/api/files/${fileId}/history`, { headers: { 'Authorization': `Bearer ${token}` } });
@@ -288,21 +357,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // --- Einstellungen-Logik ---
-    const loadUserSettings = async () => {
-        try {
-            const res = await fetch('/api/account', { headers: { 'Authorization': `Bearer ${token}` } });
-            if (res.ok) {
-                const user = await res.json();
-                settingsUsername.textContent = user.username;
-                settingsEmail.textContent = user.email;
-                userEmail.textContent = user.email;
-            }
-        } catch (error) {
-            showToast('Fehler beim Laden der Account-Daten.', false);
-        }
-    };
-
     changePasswordForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const oldPassword = oldPasswordInput.value;
@@ -343,92 +397,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     });
 
-    // --- Admin-Logik ---
-    const loadAdminData = async () => {
-        if (!isAdmin) return;
-        try {
-            const statsRes = await fetch('/api/admin/stats', { headers: { 'Authorization': `Bearer ${token}` } });
-            const stats = await statsRes.json();
-            adminStatsUsers.textContent = stats.userCount;
-            adminStatsFiles.textContent = stats.fileCount;
-
-            const usersRes = await fetch('/api/admin/users', { headers: { 'Authorization': `Bearer ${token}` } });
-            const users = await usersRes.json();
-            renderAdminUsers(users);
-
-            const filesRes = await fetch('/api/admin/files', { headers: { 'Authorization': `Bearer ${token}` } });
-            const files = await filesRes.json();
-            renderAdminFiles(files);
-        } catch (error) {
-            showToast('Fehler beim Laden der Admin-Daten.', false);
-        }
-    };
-
-    const renderAdminUsers = (users) => {
-        let html = `
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Username</th>
-                        <th>E-Mail</th>
-                        <th>Admin</th>
-                        <th>Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        users.forEach(user => {
-            html += `
-                <tr>
-                    <td>${user.username}</td>
-                    <td>${user.email}</td>
-                    <td>${user.isAdmin ? 'Ja' : 'Nein'}</td>
-                    <td class="table-actions">
-                        <button class="btn reset-password-btn" data-id="${user._id}">Passwort</button>
-                        <button class="btn danger-btn delete-user-btn" data-id="${user._id}">Löschen</button>
-                    </td>
-                </tr>
-            `;
-        });
-        html += `
-                </tbody>
-            </table>
-        `;
-        adminUserList.innerHTML = html;
-    };
-
-    const renderAdminFiles = (files) => {
-        let html = `
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Titel</th>
-                        <th>Besitzer</th>
-                        <th>Erstellt</th>
-                        <th>Aktionen</th>
-                    </tr>
-                </thead>
-                <tbody>
-        `;
-        files.forEach(file => {
-            html += `
-                <tr>
-                    <td>${file.title}</td>
-                    <td>${file.username} (${file.email})</td>
-                    <td>${new Date(file.createdAt).toLocaleDateString()}</td>
-                    <td class="table-actions">
-                        <button class="btn danger-btn delete-admin-file-btn" data-id="${file._id}">Löschen</button>
-                    </td>
-                </tr>
-            `;
-        });
-        html += `
-                </tbody>
-            </table>
-        `;
-        adminFileList.innerHTML = html;
-    };
-
     adminUserList.addEventListener('click', async (e) => {
         const userId = e.target.dataset.id;
         if (e.target.classList.contains('reset-password-btn')) {
@@ -467,7 +435,4 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
         }
     });
-
-    // Start
-    loadFiles();
 });
