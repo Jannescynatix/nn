@@ -1,4 +1,4 @@
-// /database/models/Chat.js
+// /public/models/Chat.js
 const mongoose = require('mongoose');
 
 const MessageSchema = new mongoose.Schema({

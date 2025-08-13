@@ -1,4 +1,4 @@
-// /database/models/User.js
+// /public/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcrypt');
 

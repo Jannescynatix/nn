@@ -1,4 +1,4 @@
-// public/js/script.js
+// database/js/script.js
 
 // --- Globale Variablen & Elemente ---
 const loginForm = document.getElementById('login-form');

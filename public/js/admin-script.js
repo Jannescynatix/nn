@@ -1,4 +1,4 @@
-// public/js/admin-script.js
+// database/js/admin-script.js
 
 const socket = io();
 
