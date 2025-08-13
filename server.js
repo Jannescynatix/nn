@@ -1,4 +1,4 @@
-// server.js (vollständig überarbeitet)
+// server.js
 
 const express = require('express');
 const http = require('http');
@@ -10,6 +10,8 @@ const mongoose = require('mongoose');
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
 require('dotenv').config();
+
+console.log('Server wird gestartet...');
 
 // Modelle laden
 const User = require('./database/models/User');
@@ -24,6 +26,12 @@ const server = http.createServer(app);
 const JWT_SECRET = process.env.JWT_SECRET;
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY;
 
+// Logging für Umgebungsvariablen
+console.log('Prüfe Umgebungsvariablen...');
+if (!process.env.MONGODB_URI) console.error('FEHLER: MONGODB_URI fehlt!');
+if (!JWT_SECRET) console.error('FEHLER: JWT_SECRET fehlt!');
+if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) console.error('FEHLER: ENCRYPTION_KEY fehlt oder hat falsche Länge (muss 64 Zeichen sein)!');
+
 // Passwort-Validierungsfunktion
 const validatePassword = (password) => {
     // Mindestens 8 Zeichen, Großbuchstabe, Kleinbuchstabe, Zahl und Sonderzeichen
@@ -36,6 +44,7 @@ const loginLimiter = rateLimit({
     windowMs: 60 * 1000, // 1 Minute
     max: 5, // maximal 5 Versuche pro IP pro Minute
     handler: (req, res) => {
+        console.warn(`Rate-Limit-Überschreitung für IP: ${req.ip}`);
         res.status(429).json({
             message: 'Zu viele Login-Versuche von dieser IP, bitte versuchen Sie es in einer Minute erneut.'
         });
@@ -69,6 +78,9 @@ connectDB();
 
 // Datenverschlüsselungsfunktionen
 function encrypt(text) {
+    if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
+        throw new Error('Verschlüsselung fehlgeschlagen: Ungültiger Key.');
+    }
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), iv);
     let encrypted = cipher.update(text);
@@ -77,6 +89,9 @@ function encrypt(text) {
 }
 
 function decrypt(encryptedData, iv) {
+    if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
+        throw new Error('Entschlüsselung fehlgeschlagen: Ungültiger Key.');
+    }
     try {
         const decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(ENCRYPTION_KEY, 'hex'), Buffer.from(iv, 'hex'));
         let decrypted = decipher.update(Buffer.from(encryptedData, 'hex'));
@@ -92,13 +107,16 @@ function decrypt(encryptedData, iv) {
 const authMiddleware = (req, res, next) => {
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
+        console.warn(`Autorisierungsfehler: Kein Token vorhanden für ${req.originalUrl}`);
         return res.status(401).send('Zugriff verweigert. Kein Token vorhanden.');
     }
     try {
         const verified = jwt.verify(token, JWT_SECRET);
         req.user = verified;
+        console.log(`Token verifiziert. Benutzer-ID: ${req.user.id}`);
         next();
     } catch (err) {
+        console.error(`Ungültiger Token: ${err.message}`);
         res.status(400).send('Ungültiger Token.');
     }
 };
@@ -113,14 +131,15 @@ app.get('/dashboard', (req, res) => res.sendFile(path.join(__dirname, 'public', 
 
 // Logout-Route
 app.get('/api/logout', (req, res) => {
-    // Client-seitig löschen
     res.status(200).json({ message: 'Erfolgreich abgemeldet.' });
 });
 
 // Registrierung
 app.post('/api/register', async (req, res) => {
     const { username, email, password } = req.body;
+    console.log(`Versuchter Registrierung für E-Mail: ${email}`);
     if (!validatePassword(password)) {
+        console.warn(`Registrierung fehlgeschlagen: Ungültiges Passwort für E-Mail: ${email}`);
         return res.status(400).json({
             message: 'Das Passwort muss mindestens 8 Zeichen lang sein und Großbuchstaben, Kleinbuchstaben, Zahlen und Sonderzeichen enthalten.'
         });
@@ -128,8 +147,10 @@ app.post('/api/register', async (req, res) => {
     try {
         const user = new User({ username, email, password });
         await user.save();
+        console.log(`Registrierung erfolgreich für E-Mail: ${email}`);
         res.status(201).json({ message: 'Registrierung erfolgreich. Sie können sich jetzt anmelden.' });
     } catch (err) {
+        console.error(`Registrierung fehlgeschlagen für E-Mail: ${email}. Fehler: ${err.message}`);
         res.status(400).json({ message: 'Registrierung fehlgeschlagen', error: err.message });
     }
 });
@@ -137,14 +158,18 @@ app.post('/api/register', async (req, res) => {
 // Login mit Brute-Force-Schutz
 app.post('/api/login', loginLimiter, async (req, res) => {
     const { email, password } = req.body;
+    console.log(`Login-Versuch für E-Mail: ${email}`);
     try {
         const user = await User.findOne({ email });
         if (!user || !(await user.comparePassword(password))) {
+            console.warn(`Login fehlgeschlagen: Falsche E-Mail oder falsches Passwort für E-Mail: ${email}`);
             return res.status(401).json({ message: 'Falsche E-Mail oder falsches Passwort' });
         }
         const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
+        console.log(`Login erfolgreich für E-Mail: ${email}. Token erstellt.`);
         res.status(200).json({ message: 'Anmeldung erfolgreich', token, username: user.username });
     } catch (err) {
+        console.error(`Login-Fehler für E-Mail: ${email}. Fehler: ${err.message}`);
         res.status(500).json({ message: 'Serverfehler' });
     }
 });
@@ -152,6 +177,7 @@ app.post('/api/login', loginLimiter, async (req, res) => {
 // Routen für verschlüsselte Dateien (geschützt durch Middleware)
 app.post('/api/files', authMiddleware, async (req, res) => {
     const { title, content } = req.body;
+    console.log(`Speicher-Versuch für Benutzer-ID: ${req.user.id}, Titel: "${title}"`);
     try {
         const encryptedData = encrypt(content);
         const file = new File({
@@ -161,17 +187,21 @@ app.post('/api/files', authMiddleware, async (req, res) => {
             content: encryptedData.encryptedData
         });
         await file.save();
+        console.log(`Datei erfolgreich gespeichert. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(201).json({ message: 'Datei erfolgreich gespeichert.' });
     } catch (err) {
+        console.error(`Speichern fehlgeschlagen. Benutzer-ID: ${req.user.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Speichern fehlgeschlagen', error: err.message });
     }
 });
 
 app.put('/api/files/:id', authMiddleware, async (req, res) => {
     const { title, content } = req.body;
+    console.log(`Aktualisierungsversuch für Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
     try {
         const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
         if (!file) {
+            console.warn(`Aktualisierung fehlgeschlagen: Datei nicht gefunden. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
             return res.status(404).json({ message: 'Datei nicht gefunden.' });
         }
         const encryptedData = encrypt(content);
@@ -179,13 +209,16 @@ app.put('/api/files/:id', authMiddleware, async (req, res) => {
         file.content = encryptedData.encryptedData;
         file.iv = encryptedData.iv;
         await file.save();
+        console.log(`Datei erfolgreich aktualisiert. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(200).json({ message: 'Datei erfolgreich aktualisiert.' });
     } catch (err) {
+        console.error(`Aktualisierung fehlgeschlagen. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Aktualisierung fehlgeschlagen', error: err.message });
     }
 });
 
 app.get('/api/files', authMiddleware, async (req, res) => {
+    console.log(`Abrufversuch für Dateien von Benutzer-ID: ${req.user.id}`);
     try {
         const files = await File.find({ userId: req.user.id });
         const decryptedFiles = files.map(file => ({
@@ -194,21 +227,27 @@ app.get('/api/files', authMiddleware, async (req, res) => {
             createdAt: file.createdAt,
             content: decrypt(file.content, file.iv)
         }));
+        console.log(`${decryptedFiles.length} Dateien erfolgreich für Benutzer-ID ${req.user.id} abgerufen.`);
         res.status(200).json(decryptedFiles);
     } catch (err) {
+        console.error(`Abrufen der Dateien fehlgeschlagen. Benutzer-ID: ${req.user.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Abrufen fehlgeschlagen', error: err.message });
     }
 });
 
 app.delete('/api/files/:id', authMiddleware, async (req, res) => {
+    console.log(`Löschversuch für Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
     try {
         const file = await File.findOne({ _id: req.params.id, userId: req.user.id });
         if (!file) {
+            console.warn(`Löschen fehlgeschlagen: Datei nicht gefunden. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}`);
             return res.status(404).json({ message: 'Datei nicht gefunden.' });
         }
         await file.deleteOne();
+        console.log(`Datei erfolgreich gelöscht. Benutzer-ID: ${req.user.id}, Datei-ID: ${file._id}`);
         res.status(200).json({ message: 'Datei erfolgreich gelöscht.' });
     } catch (err) {
+        console.error(`Löschen fehlgeschlagen. Benutzer-ID: ${req.user.id}, Datei-ID: ${req.params.id}, Fehler: ${err.message}`);
         res.status(500).json({ message: 'Löschen fehlgeschlagen', error: err.message });
     }
 });
